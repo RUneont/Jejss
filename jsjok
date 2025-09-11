@@ -1,108 +1,164 @@
--- @Ziggy Collapsible Fly+ESP Menu (Mobile + PC)
+--// Mod Menu with Fly + ESP
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local hrp = char:WaitForChild("HumanoidRootPart")
-local humanoid = char:WaitForChild("Humanoid")
+-- ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ModMenu"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local flying = false
-local flySpeed = 50
-
-local espEnabled = false
-local espColor = Color3.fromRGB(0,255,0)
-local highlights = {}
-
--- GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "ZiggyMenu"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 180, 0, 35) -- collapsed
-frame.Position = UDim2.new(0.5, -90, 0.5, -20)
-frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = gui
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 220, 0, 160)
+mainFrame.Position = UDim2.new(0.5, -110, 0.3, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+mainFrame.Active = true
+mainFrame.Draggable = true -- ✅ proper drag like before
+mainFrame.Parent = screenGui
 
 -- Title
-local title = Instance.new("TextButton")
-title.Size = UDim2.new(1,0,0,35)
-title.Text = "Mod Menu ▼"
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,30)
 title.BackgroundColor3 = Color3.fromRGB(40,40,40)
 title.TextColor3 = Color3.fromRGB(255,255,255)
-title.Font = Enum.Font.SourceSansBold
-title.TextScaled = true
-title.Parent = frame
+title.Text = "Mod Menu"
+title.Parent = mainFrame
 
-local expanded = false
+-- Tickbox function
+local function createCheckbox(text, order, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -10, 0, 25)
+    button.Position = UDim2.new(0, 5, 0, 35 + (order*30))
+    button.BackgroundTransparency = 1
+    button.TextColor3 = Color3.fromRGB(200,200,200)
+    button.Text = "[ ] "..text
+    button.TextXAlignment = Enum.TextXAlignment.Left
+    button.Parent = mainFrame
+    
+    local state = false
+    button.MouseButton1Click:Connect(function()
+        state = not state
+        button.Text = (state and "[x] " or "[ ] ")..text
+        callback(state)
+    end)
+end
 
--- Content
-local content = Instance.new("Frame")
-content.Size = UDim2.new(1,0,0,70)
-content.Position = UDim2.new(0,0,0,35)
-content.BackgroundColor3 = Color3.fromRGB(30,30,30)
-content.Visible = false
-content.Parent = frame
+--// ESP
+local espEnabled = false
+local espConnections = {}
 
--- Watermark
-local watermark = Instance.new("TextLabel")
-watermark.Size = UDim2.new(1,0,0,15)
-watermark.Position = UDim2.new(0,0,1,0)
-watermark.BackgroundTransparency = 1
-watermark.Text = "@Ziggy"
-watermark.TextColor3 = Color3.fromRGB(150,150,150)
-watermark.Font = Enum.Font.SourceSansItalic
-watermark.TextScaled = true
-watermark.Parent = frame
+local function toggleESP(state)
+    espEnabled = state
+    -- clear old highlights
+    for _, conn in pairs(espConnections) do
+        conn:Disconnect()
+    end
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local highlight = player.Character:FindFirstChild("ESPHighlight")
+            if highlight then highlight:Destroy() end
+        end
+    end
+    espConnections = {}
+    if espEnabled then
+        local function addHighlight(char)
+            if not char:FindFirstChild("ESPHighlight") then
+                local h = Instance.new("Highlight")
+                h.Name = "ESPHighlight"
+                h.FillTransparency = 1
+                h.OutlineColor = Color3.fromRGB(0,255,0)
+                h.OutlineTransparency = 0
+                h.Parent = char
+            end
+        end
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                if p.Character then addHighlight(p.Character) end
+                table.insert(espConnections, p.CharacterAdded:Connect(addHighlight))
+            end
+        end
+        table.insert(espConnections, Players.PlayerAdded:Connect(function(p)
+            table.insert(espConnections, p.CharacterAdded:Connect(addHighlight))
+        end))
+    end
+end
 
--- Collapse toggle
-title.MouseButton1Click:Connect(function()
-    expanded = not expanded
-    content.Visible = expanded
-    frame.Size = expanded and UDim2.new(0,180,0,110) or UDim2.new(0,180,0,35)
-    title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
+--// Fly
+local flying = false
+local ascend = false
+local descend = false
+local speed = 50
+
+local function toggleFly(state)
+    flying = state
+    if not flying then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if flying and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        local moveDir = LocalPlayer.Character.Humanoid.MoveDirection
+        local vel = (moveDir * speed)
+        if ascend then vel = vel + Vector3.new(0,speed,0) end
+        if descend then vel = vel + Vector3.new(0,-speed,0) end
+        hrp.Velocity = vel
+    end
 end)
 
--- Helper: Checkbox
-local function createCheckbox(labelText, yPos, callback)
-    local holder = Instance.new("Frame")
-    holder.Size = UDim2.new(1, -10, 0, 25)
-    holder.Position = UDim2.new(0, 5, 0, yPos)
-    holder.BackgroundTransparency = 1
-    holder.Parent = content
+-- Keyboard input
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.Space then
+        ascend = true
+    elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.Down then
+        descend = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input, gp)
+    if input.KeyCode == Enum.KeyCode.Space then
+        ascend = false
+    elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.Down then
+        descend = false
+    end
+end)
 
-    local box = Instance.new("TextButton")
-    box.Size = UDim2.new(0,20,0,20)
-    box.Position = UDim2.new(0,0,0,2)
-    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    box.Text = ""
-    box.Parent = holder
+-- Mobile ↑ / ↓ buttons
+local upBtn = Instance.new("TextButton")
+upBtn.Size = UDim2.new(0,40,0,40)
+upBtn.Position = UDim2.new(1,-50,0.7,0)
+upBtn.Text = "↑"
+upBtn.Parent = screenGui
+upBtn.MouseButton1Down:Connect(function() ascend = true end)
+upBtn.MouseButton1Up:Connect(function() ascend = false end)
 
-    local checkmark = Instance.new("TextLabel")
-    checkmark.Size = UDim2.new(1,0,1,0)
-    checkmark.BackgroundTransparency = 1
-    checkmark.Text = "✓"
-    checkmark.TextColor3 = Color3.fromRGB(0,255,0)
-    checkmark.Visible = false
-    checkmark.Parent = box
+local downBtn = Instance.new("TextButton")
+downBtn.Size = UDim2.new(0,40,0,40)
+downBtn.Position = UDim2.new(1,-50,0.8,0)
+downBtn.Text = "↓"
+downBtn.Parent = screenGui
+downBtn.MouseButton1Down:Connect(function() descend = true end)
+downBtn.MouseButton1Up:Connect(function() descend = false end)
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1,-30,1,0)
-    label.Position = UDim2.new(0,30,0,0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(255,255,255)
-    label.Font = Enum.Font.SourceSans
-    label.TextScaled = true
-    label.Parent = holder
+-- Create options
+createCheckbox("Fly",0,toggleFly)
+createCheckbox("ESP",1,toggleESP)
 
-    local state = false
+-- Watermark
+local wm = Instance.new("TextLabel")
+wm.Size = UDim2.new(1,0,0,20)
+wm.Position = UDim2.new(0,0,1,-20)
+wm.BackgroundTransparency = 1
+wm.Text = "@Ziggy"
+wm.TextColor3 = Color3.fromRGB(150,150,150)
+wm.TextScaled = true
+wm.Parent = mainFrame    local state = false
     box.MouseButton1Click:Connect(function()
         state = not state
         checkmark.Visible = state
