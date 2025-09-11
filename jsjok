@@ -1,4 +1,4 @@
--- Simple Fly GUI, exactly like previous GUI style
+-- Compact Fly GUI by @Ziggy
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -8,25 +8,28 @@ local flying = false
 local speed = 50
 local bp
 
--- GUI Setup
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FlyGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") -- parent to PlayerGui
+-- Wait for PlayerGui
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Main draggable frame
+-- GUI setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FlyGUI_Ziggy"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+-- Small, compact draggable frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 180)
-frame.Position = UDim2.new(0.5, -125, 0.3, 0)
-frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.Size = UDim2.new(0,180,0,120)
+frame.Position = UDim2.new(0.5,-90,0.3,0)
+frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
 frame.BorderSizePixel = 0
 frame.Parent = screenGui
 
--- Draggable function
+-- Draggable
 local dragging = false
 local dragInput, dragStart, startPos
 frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = frame.Position
@@ -38,7 +41,7 @@ frame.InputBegan:Connect(function(input)
     end
 end)
 frame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
 end)
@@ -52,7 +55,7 @@ end)
 
 -- Developer watermark
 local watermark = Instance.new("TextLabel")
-watermark.Size = UDim2.new(1,0,0,25)
+watermark.Size = UDim2.new(1,0,0,20)
 watermark.Position = UDim2.new(0,0,0,0)
 watermark.BackgroundTransparency = 1
 watermark.Text = "Developer: @Ziggy"
@@ -61,25 +64,31 @@ watermark.Font = Enum.Font.SourceSansBold
 watermark.TextSize = 14
 watermark.Parent = frame
 
--- Fly Toggle Button
+-- Fly toggle button
 local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0, 200, 0, 50)
-flyButton.Position = UDim2.new(0.5, -100, 0, 50)
-flyButton.Text = "Fly OFF"
+flyButton.Size = UDim2.new(0,160,0,40)
+flyButton.Position = UDim2.new(0.5,-80,0,30)
 flyButton.BackgroundColor3 = Color3.fromRGB(0,170,255)
 flyButton.TextColor3 = Color3.fromRGB(255,255,255)
+flyButton.Font = Enum.Font.SourceSansBold
+flyButton.TextSize = 16
+flyButton.Text = "Fly OFF"
 flyButton.Parent = frame
 
--- Speed TextBox
+-- Speed input box
 local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(0,200,0,40)
-speedBox.Position = UDim2.new(0.5,-100,0,120)
-speedBox.Text = tostring(speed)
+speedBox.Size = UDim2.new(0,160,0,30)
+speedBox.Position = UDim2.new(0.5,-80,0,80)
 speedBox.PlaceholderText = "Fly Speed"
+speedBox.Text = tostring(speed)
 speedBox.ClearTextOnFocus = false
+speedBox.BackgroundColor3 = Color3.fromRGB(0,255,128)
+speedBox.TextColor3 = Color3.fromRGB(0,0,0)
+speedBox.Font = Enum.Font.SourceSansBold
+speedBox.TextSize = 14
 speedBox.Parent = frame
 
--- Fly toggle functionality
+-- Fly functionality
 flyButton.MouseButton1Click:Connect(function()
     flying = not flying
     local char = LocalPlayer.Character
@@ -88,11 +97,9 @@ flyButton.MouseButton1Click:Connect(function()
     if flying then
         flyButton.Text = "Fly ON"
         if HRP then
-            bp = Instance.new("BodyPosition")
+            bp = Instance.new("BodyVelocity")
             bp.MaxForce = Vector3.new(1e5,1e5,1e5)
-            bp.D = 5
-            bp.P = 5000
-            bp.Position = HRP.Position
+            bp.Velocity = Vector3.new(0,0,0)
             bp.Parent = HRP
             if humanoid then humanoid.PlatformStand = true end
         end
@@ -110,8 +117,8 @@ speedBox.FocusLost:Connect(function()
     else speedBox.Text = tostring(speed) end
 end)
 
--- Fly movement
-RunService.RenderStepped:Connect(function()
+-- Fly movement (smooth, no sticking)
+RunService.RenderStepped:Connect(function(delta)
     if flying and bp then
         local char = LocalPlayer.Character
         local HRP = char and char:FindFirstChild("HumanoidRootPart")
@@ -125,9 +132,9 @@ RunService.RenderStepped:Connect(function()
             if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0,1,0) end
 
             if dir.Magnitude > 0 then
-                bp.Position = HRP.Position + dir.Unit * speed * RunService.RenderStepped:Wait()
+                bp.Velocity = dir.Unit * speed
             else
-                bp.Position = HRP.Position
+                bp.Velocity = Vector3.new(0,0,0)
             end
         end
     end
