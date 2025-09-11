@@ -1,4 +1,4 @@
--- Free-fly with smooth movement + draggable GUI by @Ziggy
+-- Free-fly + ESP + draggable GUI by @Ziggy
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -10,14 +10,16 @@ local humanoid = char:WaitForChild("Humanoid")
 
 local flying = false
 local speed = 50
+local espEnabled = false
+local highlights = {}
 
 -- GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 100)
-frame.Position = UDim2.new(0.5, -100, 0.5, -50) -- centered
+frame.Size = UDim2.new(0, 180, 0, 100)
+frame.Position = UDim2.new(0.5, -90, 0.5, -50) -- centered
 frame.BackgroundColor3 = Color3.fromRGB(25,25,50)
 frame.BorderSizePixel = 0
 frame.Parent = gui
@@ -33,10 +35,10 @@ watermark.Font = Enum.Font.SourceSansBold
 watermark.TextScaled = true
 watermark.Parent = frame
 
--- Fly toggle button
+-- Fly toggle button (small)
 local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0,180,0,50)
-flyButton.Position = UDim2.new(0.5,-90,0,40)
+flyButton.Size = UDim2.new(0,80,0,30)
+flyButton.Position = UDim2.new(0,10,0,30)
 flyButton.Text = "Fly OFF"
 flyButton.Font = Enum.Font.SourceSansBold
 flyButton.TextColor3 = Color3.fromRGB(255,255,255)
@@ -55,7 +57,61 @@ flyButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Draggable GUI
+-- ESP toggle button (small)
+local espButton = Instance.new("TextButton")
+espButton.Size = UDim2.new(0,80,0,30)
+espButton.Position = UDim2.new(0,90,0,30)
+espButton.Text = "ESP OFF"
+espButton.Font = Enum.Font.SourceSansBold
+espButton.TextColor3 = Color3.fromRGB(255,255,255)
+espButton.BackgroundColor3 = Color3.fromRGB(0,255,0)
+espButton.TextScaled = true
+espButton.Parent = frame
+
+espButton.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    espButton.Text = espEnabled and "ESP ON" or "ESP OFF"
+    if espEnabled then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp2 = plr.Character:FindFirstChild("HumanoidRootPart")
+                if hrp2 and not highlights[plr] then
+                    local hl = Instance.new("Highlight")
+                    hl.Adornee = plr.Character
+                    hl.FillColor = Color3.fromRGB(0,255,0)
+                    hl.OutlineTransparency = 1
+                    hl.Parent = gui
+                    highlights[plr] = hl
+                end
+            end
+        end
+    else
+        for _, hl in pairs(highlights) do
+            hl:Destroy()
+        end
+        highlights = {}
+    end
+end)
+
+-- Update ESP for new players joining
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(char)
+        if espEnabled then
+            task.wait(0.5) -- wait for HumanoidRootPart to exist
+            local hrp2 = char:FindFirstChild("HumanoidRootPart")
+            if hrp2 and not highlights[plr] then
+                local hl = Instance.new("Highlight")
+                hl.Adornee = char
+                hl.FillColor = Color3.fromRGB(0,255,0)
+                hl.OutlineTransparency = 1
+                hl.Parent = gui
+                highlights[plr] = hl
+            end
+        end
+    end)
+end)
+
+-- Draggable GUI (classic)
 do
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
