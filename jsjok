@@ -1,29 +1,35 @@
--- Guaranteed visible Fly GUI for Brookhaven
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 
+-- Wait for PlayerGui to exist
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- GUI variables
 local flying = false
 local speed = 50
 local bp
 
--- GUI Setup
+-- Create ScreenGui
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FlyGUI"
+screenGui.Name = "FlyGUI_Ziggy"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") -- Make sure parent is PlayerGui
+screenGui.Parent = PlayerGui
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-local mainFrame = Instance.new("Frame", screenGui)
+-- Main Frame
+local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 250, 0, 180)
 mainFrame.Position = UDim2.new(0.5, -125, 0.3, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35,35,35)
 mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
 
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,12)
 
--- Developer watermark
-local watermark = Instance.new("TextLabel", mainFrame)
+-- Developer Watermark
+local watermark = Instance.new("TextLabel")
 watermark.Size = UDim2.new(1,0,0,25)
 watermark.Position = UDim2.new(0,0,0,0)
 watermark.BackgroundTransparency = 1
@@ -31,8 +37,9 @@ watermark.Text = "Developer: @Ziggy"
 watermark.TextColor3 = Color3.fromRGB(255,255,255)
 watermark.Font = Enum.Font.GothamBold
 watermark.TextSize = 14
+watermark.Parent = mainFrame
 
--- Movable GUI
+-- Make GUI draggable
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -59,19 +66,20 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- Fly Toggle
-local flyButton = Instance.new("TextButton", mainFrame)
-flyButton.Size = UDim2.new(0, 200, 0, 50)
-flyButton.Position = UDim2.new(0.5, -100, 0, 40)
+-- Fly toggle button
+local flyButton = Instance.new("TextButton")
+flyButton.Size = UDim2.new(0,200,0,50)
+flyButton.Position = UDim2.new(0.5,-100,0,40)
 flyButton.BackgroundColor3 = Color3.fromRGB(0,170,255)
 flyButton.TextColor3 = Color3.fromRGB(255,255,255)
 flyButton.Font = Enum.Font.GothamBold
 flyButton.TextSize = 16
 flyButton.Text = "Fly OFF"
+flyButton.Parent = mainFrame
 Instance.new("UICorner", flyButton).CornerRadius = UDim.new(0,10)
 
--- Speed TextBox
-local speedBox = Instance.new("TextBox", mainFrame)
+-- Speed input box
+local speedBox = Instance.new("TextBox")
 speedBox.Size = UDim2.new(0,200,0,40)
 speedBox.Position = UDim2.new(0.5,-100,0,100)
 speedBox.PlaceholderText = "Fly Speed"
@@ -81,6 +89,7 @@ speedBox.BackgroundColor3 = Color3.fromRGB(0,255,128)
 speedBox.TextColor3 = Color3.fromRGB(0,0,0)
 speedBox.Font = Enum.Font.GothamBold
 speedBox.TextSize = 16
+speedBox.Parent = mainFrame
 Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0,10)
 
 -- Fly functionality
