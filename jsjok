@@ -1,4 +1,4 @@
--- @Ziggy Collapsible Fly+ESP Menu
+-- @Ziggy Collapsible Fly+ESP Menu (Mobile + PC)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -16,17 +16,19 @@ local espColor = Color3.fromRGB(0,255,0)
 local highlights = {}
 
 -- GUI
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local gui = Instance.new("ScreenGui")
+gui.Name = "ZiggyMenu"
 gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 150, 0, 30) -- start collapsed
+frame.Size = UDim2.new(0, 150, 0, 30) -- collapsed by default
 frame.Position = UDim2.new(0.5, -75, 0.5, -15)
 frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
--- Watermark / Title
+-- Title / Watermark
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,30)
 title.Position = UDim2.new(0,0,0,0)
@@ -39,9 +41,9 @@ title.Parent = frame
 
 local expanded = false
 
--- Collapsible content container
+-- Collapsible content
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1,0,0,70)
+content.Size = UDim2.new(1,0,0,50)
 content.Position = UDim2.new(0,0,0,30)
 content.BackgroundTransparency = 1
 content.Visible = false
@@ -49,13 +51,11 @@ content.Parent = frame
 
 -- Draggable (PC + Mobile)
 do
-    local dragging = false
-    local dragStart, startPos
+    local dragging, dragStart, startPos
 
     local function update(input)
-        local delta
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            delta = input.Position - dragStart
+        if dragging then
+            local delta = input.Position - dragStart
             frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
                                        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
@@ -77,17 +77,17 @@ do
     UIS.InputChanged:Connect(update)
 end
 
--- Collapse / Expand toggle
+-- Collapse/Expand
 title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         expanded = not expanded
         content.Visible = expanded
-        frame.Size = expanded and UDim2.new(0,150,0,100) or UDim2.new(0,150,0,30)
+        frame.Size = expanded and UDim2.new(0,150,0,80) or UDim2.new(0,150,0,30)
         title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
     end
 end)
 
--- Helper for minimal tick labels
+-- Helper tick labels
 local function createTickLabel(text, yPos, callback)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1,0,0,20)
@@ -139,8 +139,6 @@ RunService.RenderStepped:Connect(function()
                     hl.OutlineTransparency = 0
                     hl.Parent = gui
                     highlights[plr] = hl
-                else
-                    highlights[plr].OutlineColor = espColor
                 end
             else
                 if highlights[plr] then
@@ -152,18 +150,16 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Fly movement
+-- Fly movement (mobile + PC)
 RunService.RenderStepped:Connect(function()
     if flying then
-        local cam = workspace.CurrentCamera
-        local dir = Vector3.new()
-        if UIS:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
-
-        hrp.Velocity = dir.Magnitude > 0 and dir.Unit * flySpeed or Vector3.new(0,0,0)
+        local moveDir = humanoid.MoveDirection
+        local velocity = moveDir * flySpeed
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then
+            velocity = velocity + Vector3.new(0, flySpeed, 0)
+        elseif UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+            velocity = velocity - Vector3.new(0, flySpeed, 0)
+        end
+        hrp.Velocity = velocity
     end
 end)
