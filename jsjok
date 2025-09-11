@@ -1,41 +1,43 @@
--- @Ziggy Collapsible Fly+ESP Menu (Mobile + PC, Fixed Fly + Checkboxes)
+-- @Ziggy Collapsible Fly+ESP Menu (camera-based flight, keeps draggable menu)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 local hrp = char:WaitForChild("HumanoidRootPart")
 local humanoid = char:WaitForChild("Humanoid")
 
+-- Settings
 local flying = false
-local flySpeed = 50
-
+local flySpeed = 50 -- tweak this to taste
 local espEnabled = false
 local espColor = Color3.fromRGB(0,255,0)
 local highlights = {}
 
--- GUI
+-- GUI (keeps your drag exactly the same)
 local gui = Instance.new("ScreenGui")
 gui.Name = "ZiggyMenu"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 160, 0, 30)
-frame.Position = UDim2.new(0.5, -80, 0.5, -15)
+frame.Size = UDim2.new(0, 150, 0, 30) -- collapsed
+frame.Position = UDim2.new(0.5, -75, 0.5, -15)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.BorderSizePixel = 0
 frame.Active = true
-frame.Draggable = true
+frame.Draggable = true   -- <<< kept exactly as you wanted
 frame.Parent = gui
 
--- Title
-local title = Instance.new("TextButton")
+-- Title / watermark
+local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,0)
 title.BackgroundTransparency = 1
 title.Text = "Mod Menu ▼"
-title.TextColor3 = Color3.new(1,1,1)
+title.TextColor3 = Color3.fromRGB(255,255,255)
 title.Font = Enum.Font.SourceSansBold
 title.TextScaled = true
 title.Parent = frame
@@ -52,6 +54,7 @@ watermark.Parent = frame
 
 local expanded = false
 
+-- Collapsible content
 local content = Instance.new("Frame")
 content.Size = UDim2.new(1,0,0,50)
 content.Position = UDim2.new(0,0,0,30)
@@ -59,90 +62,430 @@ content.BackgroundTransparency = 1
 content.Visible = false
 content.Parent = frame
 
--- Collapse
-title.MouseButton1Click:Connect(function()
-    expanded = not expanded
-    content.Visible = expanded
-    frame.Size = expanded and UDim2.new(0,160,0,80) or UDim2.new(0,160,0,30)
-    title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
-end)
-
--- Checkbox helper
-local function createCheckbox(text, yPos, callback)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1,0,0,20)
-    button.Position = UDim2.new(0,0,0,yPos)
-    button.BackgroundTransparency = 1
-    button.TextColor3 = Color3.new(1,1,1)
-    button.Font = Enum.Font.SourceSans
-    button.TextScaled = true
-    button.Text = "☐ "..text
-    button.Parent = content
-
-    local ticked = false
-    button.MouseButton1Click:Connect(function()
-        ticked = not ticked
-        button.Text = (ticked and "☑ " or "☐ ")..text
-        callback(ticked)
-    end)
-end
-
--- Fly Checkbox
-createCheckbox("Fly", 0, function(val)
-    flying = val
-    if not val then
-        hrp.Velocity = Vector3.zero
+-- expand / collapse (keeps your behavior)
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        expanded = not expanded
+        content.Visible = expanded
+        frame.Size = expanded and UDim2.new(0,150,0,80) or UDim2.new(0,150,0,30)
+        title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
     end
 end)
 
--- ESP Checkbox
-createCheckbox("ESP", 25, function(val)
+-- checkbox helper: square box + checkmark ✔
+local function createCheckbox(text, yPos, callback)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1,0,0,20)
+    holder.Position = UDim2.new(0,0,0,yPos)
+    holder.BackgroundTransparency = 1
+    holder.Parent = content
+
+    local box = Instance.new("TextButton")
+    box.Name = "Box"
+    box.Size = UDim2.new(0,18,0,18)
+    box.Position = UDim2.new(0,6,0,1)
+    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    box.BorderSizePixel = 0
+    box.Text = ""
+    box.AutoButtonColor = false
+    box.Parent = holder
+
+    local check = Instance.new("TextLabel")
+    check.Size = UDim2.new(1,0,1,0)
+    check.Position = UDim2.new(0,0,0,0)
+    check.BackgroundTransparency = 1
+    check.Text = "✔"               -- actual checkmark
+    check.TextColor3 = Color3.fromRGB(0,220,0)
+    check.Visible = false
+    check.Font = Enum.Font.SourceSansBold
+    check.TextScaled = true
+    check.Parent = box
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,-30,1,0)
+    label.Position = UDim2.new(0,30,0,0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextScaled = true
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = holder
+
+    local state = false
+    box.MouseButton1Click:Connect(function()
+        state = not state
+        check.Visible = state
+        callback(state)
+    end)
+    label.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state = not state
+            check.Visible = state
+            callback(state)
+        end
+    end)
+end
+
+-- create checkboxes
+createCheckbox("Fly", 0, function(val)
+    flying = val
+    -- do NOT change PlatformStand; keep animations natural and avoid autorotate
+    if not val then
+        -- stop movement cleanly
+        if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end
+    end
+end)
+
+createCheckbox("ESP", 28, function(val)
     espEnabled = val
     if not val then
-        for _, hl in pairs(highlights) do
-            hl:Destroy()
+        for _,hl in pairs(highlights) do
+            if hl and hl.Parent then hl:Destroy() end
         end
         highlights = {}
     end
 end)
 
--- ESP Update
-RunService.RenderStepped:Connect(function()
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+-- ESP: add/remove highlight helper
+local function addHighlightToChar(charModel)
+    if not charModel or not charModel:IsA("Model") then return end
+    if charModel:FindFirstChild("ESP_Highlight") then return end
+    local hl = Instance.new("Highlight")
+    hl.Name = "ESP_Highlight"
+    hl.Adornee = charModel
+    hl.Parent = charModel
+    hl.FillTransparency = 1
+    hl.OutlineColor = espColor
+    hl.OutlineTransparency = 0
+    return hl
+end
+
+-- keep ESP updated: attach to existing + future players
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(ch)
+        if espEnabled and plr ~= player then
+            highlights[plr] = addHighlightToChar(ch)
+        end
+    end)
+end)
+
+-- initialize existing players (if esp enabled later this will add)
+local function refreshESP()
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local ch = plr.Character
             if espEnabled then
-                if not highlights[plr] then
-                    local hl = Instance.new("Highlight")
-                    hl.Adornee = plr.Character
-                    hl.FillTransparency = 1
-                    hl.OutlineColor = espColor
-                    hl.OutlineTransparency = 0
-                    hl.Parent = gui
-                    highlights[plr] = hl
+                if ch and not highlights[plr] then
+                    highlights[plr] = addHighlightToChar(ch)
                 end
-            elseif highlights[plr] then
-                highlights[plr]:Destroy()
+            else
+                if highlights[plr] and highlights[plr].Parent then
+                    highlights[plr]:Destroy()
+                end
                 highlights[plr] = nil
             end
         end
     end
+end
+
+-- keep ESP in sync every frame (cheap check)
+RunService.RenderStepped:Connect(refreshESP)
+
+-- FLY: camera-based movement (no jump ascend)
+RunService.RenderStepped:Connect(function()
+    if not flying then return end
+    if not hrp or not humanoid then return end
+
+    local cam = Workspace.CurrentCamera
+    if not cam then return end
+
+    -- compute camera horizontal axes safely
+    local look = cam.CFrame.LookVector
+    local right = cam.CFrame.RightVector
+
+    local horizLook = Vector3.new(look.X, 0, look.Z)
+    local forwardAxis = (horizLook.Magnitude > 0.001) and horizLook.Unit or Vector3.new(0,0,-1)
+    local rightAxis = Vector3.new(right.X, 0, right.Z)
+    rightAxis = (rightAxis.Magnitude > 0.001) and rightAxis.Unit or Vector3.new(1,0,0)
+
+    -- get player's movement input via humanoid.MoveDirection (works for joystick/mobile + WASD)
+    local moveDir = humanoid.MoveDirection -- note: this is purely horizontal (Y=0)
+    -- projected signed inputs (forward/back and right/left)
+    local forwardInput = moveDir:Dot(forwardAxis)   -- -1..1 (forward positive)
+    local rightInput = moveDir:Dot(rightAxis)       -- -1..1 (right positive)
+
+    -- desired movement in world-space: follow camera LookVector incl. its Y component, so looking up = forward moves up
+    local desired = cam.CFrame.LookVector * forwardInput + cam.CFrame.RightVector * rightInput
+
+    -- vertical modifier via shift (descend)
+    if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+        desired = desired - Vector3.new(0,1,0) * 1 -- add downward intent
+    end
+
+    -- final velocity
+    local finalVel = desired * flySpeed
+
+    -- apply using AssemblyLinearVelocity to avoid autorotation
+    hrp.AssemblyLinearVelocity = finalVel
 end)
 
--- Fly Movement
-RunService.RenderStepped:Connect(function()
-    if flying then
-        local moveDir = humanoid.MoveDirection
-        local velocity = moveDir * flySpeed
-
-        -- Up
-        if UIS:IsKeyDown(Enum.KeyCode.Space) or humanoid.Jump then
-            velocity = velocity + Vector3.new(0, flySpeed, 0)
-        end
-        -- Down
-        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
-            velocity = velocity - Vector3.new(0, flySpeed, 0)
-        end
-
-        hrp.AssemblyLinearVelocity = velocity
+-- ensure descendant cleanup on leaving
+Players.PlayerRemoving:Connect(function(plr)
+    if highlights[plr] then
+        if highlights[plr].Parent then highlights[plr]:Destroy() end
+        highlights[plr] = nil
     end
+end)
+
+-- small safety: if character respawns update references
+player.CharacterAdded:Connect(function(c)
+    char = c
+    hrp = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
+end)-- @Ziggy Collapsible Fly+ESP Menu (camera-based flight, keeps draggable menu)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
+
+-- Settings
+local flying = false
+local flySpeed = 50 -- tweak this to taste
+local espEnabled = false
+local espColor = Color3.fromRGB(0,255,0)
+local highlights = {}
+
+-- GUI (keeps your drag exactly the same)
+local gui = Instance.new("ScreenGui")
+gui.Name = "ZiggyMenu"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 150, 0, 30) -- collapsed
+frame.Position = UDim2.new(0.5, -75, 0.5, -15)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true   -- <<< kept exactly as you wanted
+frame.Parent = gui
+
+-- Title / watermark
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,0)
+title.BackgroundTransparency = 1
+title.Text = "Mod Menu ▼"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Font = Enum.Font.SourceSansBold
+title.TextScaled = true
+title.Parent = frame
+
+local watermark = Instance.new("TextLabel")
+watermark.Size = UDim2.new(1,0,0,15)
+watermark.Position = UDim2.new(0,0,1,0)
+watermark.BackgroundTransparency = 1
+watermark.Text = "@Ziggy"
+watermark.TextColor3 = Color3.fromRGB(150,150,150)
+watermark.Font = Enum.Font.SourceSansItalic
+watermark.TextScaled = true
+watermark.Parent = frame
+
+local expanded = false
+
+-- Collapsible content
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,0,0,50)
+content.Position = UDim2.new(0,0,0,30)
+content.BackgroundTransparency = 1
+content.Visible = false
+content.Parent = frame
+
+-- expand / collapse (keeps your behavior)
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        expanded = not expanded
+        content.Visible = expanded
+        frame.Size = expanded and UDim2.new(0,150,0,80) or UDim2.new(0,150,0,30)
+        title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
+    end
+end)
+
+-- checkbox helper: square box + checkmark ✔
+local function createCheckbox(text, yPos, callback)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1,0,0,20)
+    holder.Position = UDim2.new(0,0,0,yPos)
+    holder.BackgroundTransparency = 1
+    holder.Parent = content
+
+    local box = Instance.new("TextButton")
+    box.Name = "Box"
+    box.Size = UDim2.new(0,18,0,18)
+    box.Position = UDim2.new(0,6,0,1)
+    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    box.BorderSizePixel = 0
+    box.Text = ""
+    box.AutoButtonColor = false
+    box.Parent = holder
+
+    local check = Instance.new("TextLabel")
+    check.Size = UDim2.new(1,0,1,0)
+    check.Position = UDim2.new(0,0,0,0)
+    check.BackgroundTransparency = 1
+    check.Text = "✔"               -- actual checkmark
+    check.TextColor3 = Color3.fromRGB(0,220,0)
+    check.Visible = false
+    check.Font = Enum.Font.SourceSansBold
+    check.TextScaled = true
+    check.Parent = box
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,-30,1,0)
+    label.Position = UDim2.new(0,30,0,0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextScaled = true
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = holder
+
+    local state = false
+    box.MouseButton1Click:Connect(function()
+        state = not state
+        check.Visible = state
+        callback(state)
+    end)
+    label.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state = not state
+            check.Visible = state
+            callback(state)
+        end
+    end)
+end
+
+-- create checkboxes
+createCheckbox("Fly", 0, function(val)
+    flying = val
+    -- do NOT change PlatformStand; keep animations natural and avoid autorotate
+    if not val then
+        -- stop movement cleanly
+        if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end
+    end
+end)
+
+createCheckbox("ESP", 28, function(val)
+    espEnabled = val
+    if not val then
+        for _,hl in pairs(highlights) do
+            if hl and hl.Parent then hl:Destroy() end
+        end
+        highlights = {}
+    end
+end)
+
+-- ESP: add/remove highlight helper
+local function addHighlightToChar(charModel)
+    if not charModel or not charModel:IsA("Model") then return end
+    if charModel:FindFirstChild("ESP_Highlight") then return end
+    local hl = Instance.new("Highlight")
+    hl.Name = "ESP_Highlight"
+    hl.Adornee = charModel
+    hl.Parent = charModel
+    hl.FillTransparency = 1
+    hl.OutlineColor = espColor
+    hl.OutlineTransparency = 0
+    return hl
+end
+
+-- keep ESP updated: attach to existing + future players
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(ch)
+        if espEnabled and plr ~= player then
+            highlights[plr] = addHighlightToChar(ch)
+        end
+    end)
+end)
+
+-- initialize existing players (if esp enabled later this will add)
+local function refreshESP()
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local ch = plr.Character
+            if espEnabled then
+                if ch and not highlights[plr] then
+                    highlights[plr] = addHighlightToChar(ch)
+                end
+            else
+                if highlights[plr] and highlights[plr].Parent then
+                    highlights[plr]:Destroy()
+                end
+                highlights[plr] = nil
+            end
+        end
+    end
+end
+
+-- keep ESP in sync every frame (cheap check)
+RunService.RenderStepped:Connect(refreshESP)
+
+-- FLY: camera-based movement (no jump ascend)
+RunService.RenderStepped:Connect(function()
+    if not flying then return end
+    if not hrp or not humanoid then return end
+
+    local cam = Workspace.CurrentCamera
+    if not cam then return end
+
+    -- compute camera horizontal axes safely
+    local look = cam.CFrame.LookVector
+    local right = cam.CFrame.RightVector
+
+    local horizLook = Vector3.new(look.X, 0, look.Z)
+    local forwardAxis = (horizLook.Magnitude > 0.001) and horizLook.Unit or Vector3.new(0,0,-1)
+    local rightAxis = Vector3.new(right.X, 0, right.Z)
+    rightAxis = (rightAxis.Magnitude > 0.001) and rightAxis.Unit or Vector3.new(1,0,0)
+
+    -- get player's movement input via humanoid.MoveDirection (works for joystick/mobile + WASD)
+    local moveDir = humanoid.MoveDirection -- note: this is purely horizontal (Y=0)
+    -- projected signed inputs (forward/back and right/left)
+    local forwardInput = moveDir:Dot(forwardAxis)   -- -1..1 (forward positive)
+    local rightInput = moveDir:Dot(rightAxis)       -- -1..1 (right positive)
+
+    -- desired movement in world-space: follow camera LookVector incl. its Y component, so looking up = forward moves up
+    local desired = cam.CFrame.LookVector * forwardInput + cam.CFrame.RightVector * rightInput
+
+    -- vertical modifier via shift (descend)
+    if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+        desired = desired - Vector3.new(0,1,0) * 1 -- add downward intent
+    end
+
+    -- final velocity
+    local finalVel = desired * flySpeed
+
+    -- apply using AssemblyLinearVelocity to avoid autorotation
+    hrp.AssemblyLinearVelocity = finalVel
+end)
+
+-- ensure descendant cleanup on leaving
+Players.PlayerRemoving:Connect(function(plr)
+    if highlights[plr] then
+        if highlights[plr].Parent then highlights[plr]:Destroy() end
+        highlights[plr] = nil
+    end
+end)
+
+-- small safety: if character respawns update references
+player.CharacterAdded:Connect(function(c)
+    char = c
+    hrp = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
 end)
