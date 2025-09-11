@@ -1,4 +1,4 @@
--- Fly + ESP GUI by @Ziggy
+-- @Ziggy Fly + ESP GUI (mobile & PC draggable)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -20,9 +20,9 @@ local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 150)
-frame.Position = UDim2.new(0.5, -110, 0.5, -75)
-frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.Size = UDim2.new(0, 180, 0, 150)
+frame.Position = UDim2.new(0.5, -90, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
@@ -37,11 +37,24 @@ watermark.Font = Enum.Font.SourceSansBold
 watermark.TextScaled = true
 watermark.Parent = frame
 
--- Draggable GUI
+-- Fully draggable GUI (PC + mobile)
 do
-    local dragging, dragInput, dragStart, startPos
+    local dragging = false
+    local dragStart, startPos
+
+    local function update(input)
+        local delta
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            delta = input.Position - dragStart
+        elseif input.UserInputType == Enum.UserInputType.Touch then
+            delta = input.Position - dragStart
+        else return end
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                   startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
     frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
@@ -52,25 +65,23 @@ do
             end)
         end
     end)
-    
+
     frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            frame.InputChanged:Connect(function(inp)
+                if dragging then update(inp) end
+            end)
         end
     end)
-    
+
     UIS.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
+        if dragging then update(input) end
     end)
 end
 
--- Fly toggle button
+-- Fly button
 local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0,100,0,30)
+flyButton.Size = UDim2.new(0,80,0,30)
 flyButton.Position = UDim2.new(0,10,0,30)
 flyButton.Text = "Fly OFF"
 flyButton.Font = Enum.Font.SourceSansBold
@@ -87,13 +98,14 @@ flyButton.MouseButton1Click:Connect(function()
     else
         flyButton.Text = "Fly OFF"
         humanoid.PlatformStand = false
+        hrp.Velocity = Vector3.new(0,0,0)
     end
 end)
 
 -- ESP checkbox
 local espCheck = Instance.new("TextButton")
 espCheck.Size = UDim2.new(0,80,0,30)
-espCheck.Position = UDim2.new(0,10,0,70)
+espCheck.Position = UDim2.new(0,90,0,30)
 espCheck.Text = "ESP OFF"
 espCheck.Font = Enum.Font.SourceSansBold
 espCheck.TextColor3 = Color3.fromRGB(255,255,255)
@@ -112,26 +124,22 @@ espCheck.MouseButton1Click:Connect(function()
     end
 end)
 
--- ESP color picker (simple)
-local colorBox = Instance.new("TextButton")
-colorBox.Size = UDim2.new(0,120,0,30)
-colorBox.Position = UDim2.new(0,10,0,110)
-colorBox.Text = "ESP Color"
-colorBox.Font = Enum.Font.SourceSansBold
-colorBox.TextColor3 = espColor
-colorBox.BackgroundColor3 = Color3.fromRGB(20,20,20)
-colorBox.TextScaled = true
-colorBox.Parent = frame
+-- ESP color wheel
+local colorWheel = Instance.new("TextButton")
+colorWheel.Size = UDim2.new(0,80,0,30)
+colorWheel.Position = UDim2.new(0,10,0,70)
+colorWheel.Text = "ESP Color"
+colorWheel.Font = Enum.Font.SourceSansBold
+colorWheel.TextColor3 = espColor
+colorWheel.BackgroundColor3 = Color3.fromRGB(30,30,30)
+colorWheel.TextScaled = true
+colorWheel.Parent = frame
 
-colorBox.MouseButton1Click:Connect(function()
-    -- cycle through some preset colors
-    local colors = {Color3.fromRGB(0,255,0), Color3.fromRGB(255,0,0), Color3.fromRGB(0,0,255), Color3.fromRGB(255,255,0), Color3.fromRGB(255,255,255)}
-    local currentIndex = 1
-    for i,c in pairs(colors) do
-        if c == espColor then currentIndex = i end
-    end
-    espColor = colors[currentIndex % #colors + 1]
-    colorBox.TextColor3 = espColor
+local hue = 0
+colorWheel.MouseButton1Click:Connect(function()
+    hue = (hue + 0.05) % 1
+    espColor = Color3.fromHSV(hue,1,1)
+    colorWheel.TextColor3 = espColor
 end)
 
 -- ESP updater
@@ -142,7 +150,6 @@ local function updateESP()
                 if not highlights[plr] then
                     local hl = Instance.new("Highlight")
                     hl.Adornee = plr.Character
-                    hl.FillColor = espColor
                     hl.FillTransparency = 1
                     hl.OutlineColor = espColor
                     hl.OutlineTransparency = 0
@@ -160,27 +167,20 @@ local function updateESP()
         end
     end
 end
-
 RunService.RenderStepped:Connect(updateESP)
 
 -- Fly movement
-RunService.RenderStepped:Connect(function(delta)
+RunService.RenderStepped:Connect(function()
     if flying then
         local cam = workspace.CurrentCamera
         local dir = Vector3.new()
-        if UIS:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
 
-        if dir.Magnitude > 0 then
-            hrp.Velocity = dir.Unit * flySpeed
-        else
-            hrp.Velocity = Vector3.new(0,0,0)
-        end
-    else
-        hrp.Velocity = Vector3.new(0,0,0)
+        hrp.Velocity = dir.Magnitude > 0 and dir.Unit * flySpeed or Vector3.new(0,0,0)
     end
 end)
