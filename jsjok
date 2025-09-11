@@ -22,25 +22,35 @@ gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 150, 0, 30) -- collapsed
-frame.Position = UDim2.new(0.5, -75, 0.5, -15)
-frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.Size = UDim2.new(0, 180, 0, 35) -- collapsed
+frame.Position = UDim2.new(0.5, -90, 0.5, -20)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
 frame.BorderSizePixel = 0
 frame.Active = true
-frame.Draggable = true -- works for PC + mobile
+frame.Draggable = true
 frame.Parent = gui
 
--- Title / Watermark
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,30)
-title.Position = UDim2.new(0,0,0,0)
-title.BackgroundTransparency = 1
+-- Title
+local title = Instance.new("TextButton")
+title.Size = UDim2.new(1,0,0,35)
 title.Text = "Mod Menu ▼"
+title.BackgroundColor3 = Color3.fromRGB(40,40,40)
 title.TextColor3 = Color3.fromRGB(255,255,255)
 title.Font = Enum.Font.SourceSansBold
 title.TextScaled = true
 title.Parent = frame
 
+local expanded = false
+
+-- Content
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,0,0,70)
+content.Position = UDim2.new(0,0,0,35)
+content.BackgroundColor3 = Color3.fromRGB(30,30,30)
+content.Visible = false
+content.Parent = frame
+
+-- Watermark
 local watermark = Instance.new("TextLabel")
 watermark.Size = UDim2.new(1,0,0,15)
 watermark.Position = UDim2.new(0,0,1,0)
@@ -51,56 +61,64 @@ watermark.Font = Enum.Font.SourceSansItalic
 watermark.TextScaled = true
 watermark.Parent = frame
 
-local expanded = false
-
--- Collapsible content
-local content = Instance.new("Frame")
-content.Size = UDim2.new(1,0,0,50)
-content.Position = UDim2.new(0,0,0,30)
-content.BackgroundTransparency = 1
-content.Visible = false
-content.Parent = frame
-
--- Collapse/Expand
-title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        expanded = not expanded
-        content.Visible = expanded
-        frame.Size = expanded and UDim2.new(0,150,0,80) or UDim2.new(0,150,0,30)
-        title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
-    end
+-- Collapse toggle
+title.MouseButton1Click:Connect(function()
+    expanded = not expanded
+    content.Visible = expanded
+    frame.Size = expanded and UDim2.new(0,180,0,110) or UDim2.new(0,180,0,35)
+    title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
 end)
 
--- Helper tick labels
-local function createTickLabel(text, yPos, callback)
+-- Helper: Checkbox
+local function createCheckbox(labelText, yPos, callback)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1, -10, 0, 25)
+    holder.Position = UDim2.new(0, 5, 0, yPos)
+    holder.BackgroundTransparency = 1
+    holder.Parent = content
+
+    local box = Instance.new("TextButton")
+    box.Size = UDim2.new(0,20,0,20)
+    box.Position = UDim2.new(0,0,0,2)
+    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    box.Text = ""
+    box.Parent = holder
+
+    local checkmark = Instance.new("TextLabel")
+    checkmark.Size = UDim2.new(1,0,1,0)
+    checkmark.BackgroundTransparency = 1
+    checkmark.Text = "✓"
+    checkmark.TextColor3 = Color3.fromRGB(0,255,0)
+    checkmark.Visible = false
+    checkmark.Parent = box
+
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1,0,0,20)
-    label.Position = UDim2.new(0,0,0,yPos)
+    label.Size = UDim2.new(1,-30,1,0)
+    label.Position = UDim2.new(0,30,0,0)
     label.BackgroundTransparency = 1
+    label.Text = labelText
     label.TextColor3 = Color3.fromRGB(255,255,255)
     label.Font = Enum.Font.SourceSans
     label.TextScaled = true
-    label.Text = "[ ] "..text
-    label.Parent = content
+    label.Parent = holder
 
-    label.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            local ticked = label.Text:sub(1,3) == "[x]"
-            label.Text = (ticked and "[ ] " or "[x] ")..text
-            callback(not ticked)
-        end
+    local state = false
+    box.MouseButton1Click:Connect(function()
+        state = not state
+        checkmark.Visible = state
+        callback(state)
     end)
 end
 
--- Fly tick
-createTickLabel("Fly", 0, function(val)
+-- Fly Checkbox
+createCheckbox("Fly", 5, function(val)
     flying = val
     humanoid.PlatformStand = val
     if not val then hrp.Velocity = Vector3.new(0,0,0) end
 end)
 
--- ESP tick
-createTickLabel("ESP", 25, function(val)
+-- ESP Checkbox
+createCheckbox("ESP", 35, function(val)
     espEnabled = val
     if not val then
         for _, hl in pairs(highlights) do
@@ -110,7 +128,7 @@ createTickLabel("ESP", 25, function(val)
     end
 end)
 
--- ESP updater
+-- ESP loop
 RunService.RenderStepped:Connect(function()
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
@@ -134,13 +152,12 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Fly movement (mobile + PC)
+-- Fly movement (supports PC + mobile joystick)
 RunService.RenderStepped:Connect(function()
     if flying then
         local moveDir = humanoid.MoveDirection
         local velocity = moveDir * flySpeed
 
-        -- Up/Down
         if UIS:IsKeyDown(Enum.KeyCode.Space) or humanoid.Jump then
             velocity = velocity + Vector3.new(0, flySpeed, 0)
         elseif UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
