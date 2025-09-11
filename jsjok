@@ -1,4 +1,4 @@
--- Brookhaven Fly GUI (Colorful + Themed + Developer Watermark)
+-- Brookhaven Sky-Walk Fly GUI (Movable + Colorful + Developer @Ziggy)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -6,7 +6,7 @@ local UIS = game:GetService("UserInputService")
 
 local flying = false
 local speed = 50
-local bv
+local bp
 
 -- GUI Setup
 local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
@@ -15,27 +15,25 @@ screenGui.Name = "FlyGUI"
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Size = UDim2.new(0, 250, 0, 180)
 mainFrame.Position = UDim2.new(0.5, -125, 0.3, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
-mainFrame.AnchorPoint = Vector2.new(0.5, 0)
+mainFrame.AnchorPoint = Vector2.new(0.5,0)
 
 -- Rounded corners
-local UICorner = Instance.new("UICorner", mainFrame)
-UICorner.CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,12)
 
--- Developer Watermark
+-- Developer watermark
 local watermark = Instance.new("TextLabel", mainFrame)
-watermark.Size = UDim2.new(1, 0, 0, 25)
+watermark.Size = UDim2.new(1,0,0,25)
 watermark.Position = UDim2.new(0,0,0,0)
 watermark.BackgroundTransparency = 1
-watermark.Text = "Developer: Mid_NightCreper24"
+watermark.Text = "Developer: @Ziggy"
 watermark.TextColor3 = Color3.fromRGB(255,255,255)
 watermark.Font = Enum.Font.GothamBold
 watermark.TextSize = 14
-watermark.TextScaled = false
 
--- Make frame draggable
+-- Make GUI draggable
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -57,7 +55,8 @@ end)
 UIS.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
@@ -70,15 +69,12 @@ flyButton.TextColor3 = Color3.fromRGB(255,255,255)
 flyButton.Font = Enum.Font.GothamBold
 flyButton.TextSize = 16
 flyButton.Text = "Fly OFF"
-flyButton.AutoButtonColor = true
-flyButton.TextScaled = true
-local flyUICorner = Instance.new("UICorner", flyButton)
-flyUICorner.CornerRadius = UDim.new(0,10)
+Instance.new("UICorner", flyButton).CornerRadius = UDim.new(0,10)
 
 -- Speed TextBox
 local speedBox = Instance.new("TextBox", mainFrame)
-speedBox.Size = UDim2.new(0, 200, 0, 40)
-speedBox.Position = UDim2.new(0.5, -100, 0, 100)
+speedBox.Size = UDim2.new(0,200,0,40)
+speedBox.Position = UDim2.new(0.5,-100,0,100)
 speedBox.PlaceholderText = "Fly Speed"
 speedBox.Text = tostring(speed)
 speedBox.ClearTextOnFocus = false
@@ -86,23 +82,68 @@ speedBox.BackgroundColor3 = Color3.fromRGB(0,255,128)
 speedBox.TextColor3 = Color3.fromRGB(0,0,0)
 speedBox.Font = Enum.Font.GothamBold
 speedBox.TextSize = 16
-local speedUICorner = Instance.new("UICorner", speedBox)
-speedUICorner.CornerRadius = UDim.new(0,10)
+Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0,10)
 
--- Fly Toggle Functionality
+-- Fly Toggle functionality
 flyButton.MouseButton1Click:Connect(function()
     flying = not flying
-    local character = LocalPlayer.Character
-    local HRP = character and character:FindFirstChild("HumanoidRootPart")
+    local char = LocalPlayer.Character
+    local HRP = char and char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
     if flying then
         flyButton.Text = "Fly ON"
         if HRP then
-            bv = Instance.new("BodyVelocity")
-            bv.MaxForce = Vector3.new(1e5,1e5,1e5)
-            bv.Velocity = Vector3.new(0,0,0)
-            bv.Parent = HRP
+            bp = Instance.new("BodyPosition")
+            bp.MaxForce = Vector3.new(1e5,1e5,1e5)
+            bp.D = 5
+            bp.P = 5000
+            bp.Position = HRP.Position
+            bp.Parent = HRP
+            if humanoid then
+                humanoid.PlatformStand = true
+            end
         end
     else
+        flyButton.Text = "Fly OFF"
+        if bp then bp:Destroy() end
+        if humanoid then
+            humanoid.PlatformStand = false
+        end
+    end
+end)
+
+-- Update speed
+speedBox.FocusLost:Connect(function()
+    local val = tonumber(speedBox.Text)
+    if val and val > 0 then
+        speed = val
+    else
+        speedBox.Text = tostring(speed)
+    end
+end)
+
+-- Fly movement (WASD + Space/Shift)
+RunService.RenderStepped:Connect(function()
+    if flying and bp then
+        local char = LocalPlayer.Character
+        local HRP = char and char:FindFirstChild("HumanoidRootPart")
+        if HRP then
+            local dir = Vector3.new()
+            if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + workspace.CurrentCamera.CFrame.LookVector end
+            if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - workspace.CurrentCamera.CFrame.LookVector end
+            if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - workspace.CurrentCamera.CFrame.RightVector end
+            if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + workspace.CurrentCamera.CFrame.RightVector end
+            if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
+            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0,1,0) end
+
+            if dir.Magnitude > 0 then
+                bp.Position = HRP.Position + dir.Unit * speed * RunService.RenderStepped:Wait()
+            else
+                bp.Position = HRP.Position
+            end
+        end
+    end
+end)    else
         flyButton.Text = "Fly OFF"
         if bv then bv:Destroy() end
     end
