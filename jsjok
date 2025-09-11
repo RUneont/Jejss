@@ -1,4 +1,4 @@
--- @Ziggy Collapsible Fly+ESP Menu + Sticky Player (attach to target)
+-- @Ziggy Collapsible Fly+ESP Menu + Sticky Player (with arrows)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -9,22 +9,23 @@ local char = player.Character or player.CharacterAdded:Wait()
 local hrp = char:WaitForChild("HumanoidRootPart")
 local humanoid = char:WaitForChild("Humanoid")
 
--- Settings
+-- State
 local flying = false
-local flySpeed = 200
+local flySpeed = 50
 local espEnabled = false
-local espColor = Color3.fromRGB(255,105,180)
+local espColor = Color3.fromRGB(255,165,0)
 local highlights = {}
 local stickyTarget = nil
 local stickyActive = false
-local stickOffset = Vector3.new(0,0,3) -- behind target
+local stickOffset = Vector3.new(0,0,3)
+local invisible = false
 
 -- Prevent duplicate GUI
 if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then
     player.PlayerGui.ZiggyMenu:Destroy()
 end
 
--- GUI
+-- GUI base
 local gui = Instance.new("ScreenGui")
 gui.Name = "ZiggyMenu"
 gui.ResetOnSpawn = false
@@ -41,7 +42,6 @@ frame.Parent = gui
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,30)
-title.Position = UDim2.new(0,0,0,0)
 title.BackgroundTransparency = 1
 title.Text = "Mod Menu ▼"
 title.TextColor3 = Color3.fromRGB(255,255,255)
@@ -51,7 +51,7 @@ title.Parent = frame
 
 local expanded = false
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1,0,0,50)
+content.Size = UDim2.new(1,0,0,200)
 content.Position = UDim2.new(0,0,0,30)
 content.BackgroundTransparency = 1
 content.Visible = false
@@ -61,7 +61,7 @@ title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         expanded = not expanded
         content.Visible = expanded
-        frame.Size = expanded and UDim2.new(0,150,0,140) or UDim2.new(0,150,0,30)
+        frame.Size = expanded and UDim2.new(0,150,0,230) or UDim2.new(0,150,0,30)
         title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
     end
 end)
@@ -75,7 +75,6 @@ local function createCheckbox(text, yPos, callback)
     holder.Parent = content
 
     local box = Instance.new("TextButton")
-    box.Name = "Box"
     box.Size = UDim2.new(0,18,0,18)
     box.Position = UDim2.new(0,6,0,1)
     box.BackgroundColor3 = Color3.fromRGB(60,60,60)
@@ -86,9 +85,8 @@ local function createCheckbox(text, yPos, callback)
 
     local check = Instance.new("TextLabel")
     check.Size = UDim2.new(1,0,1,0)
-    check.Position = UDim2.new(0,0,0,0)
     check.BackgroundTransparency = 1
-    check.Text = "☑"
+    check.Text = "✔"
     check.TextColor3 = Color3.fromRGB(0,220,0)
     check.Visible = false
     check.Font = Enum.Font.SourceSansBold
@@ -112,7 +110,6 @@ local function createCheckbox(text, yPos, callback)
         check.Visible = state
         callback(state)
     end
-
     box.MouseButton1Click:Connect(toggle)
     label.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -133,7 +130,147 @@ createCheckbox("ESP", 28, function(val)
     for _,plr in pairs(Players:GetPlayers()) do
         if plr ~= player then
             local ch = plr.Character
-            if val then
+            if val and ch and not highlights[plr] then
+                local hl = Instance.new("Highlight")
+                hl.Name = "ESP_Highlight"
+                hl.Adornee = ch
+                hl.Parent = ch
+                hl.FillTransparency = 1
+                hl.OutlineColor = espColor
+                highlights[plr] = hl
+            elseif not val and highlights[plr] then
+                highlights[plr]:Destroy()
+                highlights[plr] = nil
+            end
+        end
+    end
+end)
+
+-- Invisible Checkbox
+createCheckbox("Invisible", 56, function(val)
+    invisible = val
+    if char then
+        for _,part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = val and 1 or 0
+            end
+        end
+    end
+end)
+
+-- Player selector (arrows + label)
+local currentIndex = 1
+local targetPlayers = {}
+
+local function refreshPlayers()
+    targetPlayers = {}
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            table.insert(targetPlayers, plr)
+        end
+    end
+    if currentIndex > #targetPlayers then
+        currentIndex = 1
+    end
+end
+
+refreshPlayers()
+Players.PlayerAdded:Connect(refreshPlayers)
+Players.PlayerRemoving:Connect(refreshPlayers)
+
+local targetFrame = Instance.new("Frame")
+targetFrame.Size = UDim2.new(1,-10,0,20)
+targetFrame.Position = UDim2.new(0,5,0,85)
+targetFrame.BackgroundTransparency = 1
+targetFrame.Parent = content
+
+local leftBtn = Instance.new("TextButton")
+leftBtn.Size = UDim2.new(0,20,1,0)
+leftBtn.Text = "<"
+leftBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+leftBtn.TextColor3 = Color3.fromRGB(255,255,255)
+leftBtn.Parent = targetFrame
+
+local rightBtn = leftBtn:Clone()
+rightBtn.Text = ">"
+rightBtn.Parent = targetFrame
+rightBtn.Position = UDim2.new(1,-20,0,0)
+
+local nameLabel = Instance.new("TextLabel")
+nameLabel.Size = UDim2.new(1,-40,1,0)
+nameLabel.Position = UDim2.new(0,20,0,0)
+nameLabel.BackgroundTransparency = 1
+nameLabel.TextColor3 = Color3.fromRGB(255,255,255)
+nameLabel.Text = (#targetPlayers > 0 and targetPlayers[currentIndex].Name) or "No Players"
+nameLabel.Font = Enum.Font.SourceSans
+nameLabel.TextScaled = true
+nameLabel.Parent = targetFrame
+
+local function updateLabel()
+    if #targetPlayers > 0 then
+        nameLabel.Text = targetPlayers[currentIndex].Name
+    else
+        nameLabel.Text = "No Players"
+    end
+end
+
+leftBtn.MouseButton1Click:Connect(function()
+    if #targetPlayers > 0 then
+        currentIndex = (currentIndex - 2) % #targetPlayers + 1
+        updateLabel()
+    end
+end)
+
+rightBtn.MouseButton1Click:Connect(function()
+    if #targetPlayers > 0 then
+        currentIndex = (currentIndex % #targetPlayers) + 1
+        updateLabel()
+    end
+end)
+
+-- Stick & Unstick buttons
+local stickBtn = Instance.new("TextButton")
+stickBtn.Size = UDim2.new(1,-10,0,20)
+stickBtn.Position = UDim2.new(0,5,0,110)
+stickBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+stickBtn.TextColor3 = Color3.fromRGB(255,255,255)
+stickBtn.Text = "Stick to Back"
+stickBtn.Parent = content
+
+stickBtn.MouseButton1Click:Connect(function()
+    if #targetPlayers > 0 then
+        stickyTarget = targetPlayers[currentIndex]
+        stickyActive = true
+    end
+end)
+
+local unstickBtn = stickBtn:Clone()
+unstickBtn.Text = "Unstick"
+unstickBtn.Position = UDim2.new(0,5,0,135)
+unstickBtn.Parent = content
+
+unstickBtn.MouseButton1Click:Connect(function()
+    stickyActive = false
+    stickyTarget = nil
+end)
+
+-- Watermark
+local watermark = Instance.new("TextLabel")
+watermark.Size = UDim2.new(1,0,0,15)
+watermark.Position = UDim2.new(0,0,0,160)
+watermark.BackgroundTransparency = 1
+watermark.Text = "@Ziggy"
+watermark.TextColor3 = Color3.fromRGB(255,255,255)
+watermark.Font = Enum.Font.SourceSansItalic
+watermark.TextScaled = true
+watermark.Parent = content
+
+-- ESP refresh
+RunService.RenderStepped:Connect(function()
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local ch = plr.Character
+            if espEnabled then
                 if ch and not highlights[plr] then
                     local hl = Instance.new("Highlight")
                     hl.Name = "ESP_Highlight"
@@ -141,89 +278,48 @@ createCheckbox("ESP", 28, function(val)
                     hl.Parent = ch
                     hl.FillTransparency = 1
                     hl.OutlineColor = espColor
-                    hl.OutlineTransparency = 0
                     highlights[plr] = hl
                 end
             else
-                if highlights[plr] and highlights[plr].Parent then
+                if highlights[plr] then
                     highlights[plr]:Destroy()
+                    highlights[plr] = nil
                 end
-                highlights[plr] = nil
             end
         end
     end
 end)
 
--- Sticky Player UI
-local stickyBox = Instance.new("TextBox")
-stickyBox.Size = UDim2.new(1,-10,0,20)
-stickyBox.Position = UDim2.new(0,5,0,55)
-stickyBox.BackgroundColor3 = Color3.fromRGB(60,60,60)
-stickyBox.TextColor3 = Color3.fromRGB(255,255,255)
-stickyBox.PlaceholderText = "Enter username..."
-stickyBox.Font = Enum.Font.SourceSans
-stickyBox.TextScaled = true
-stickyBox.ClearTextOnFocus = false
-stickyBox.Parent = content
-
-local stickyButton = Instance.new("TextButton")
-stickyButton.Size = UDim2.new(1,-10,0,20)
-stickyButton.Position = UDim2.new(0,5,0,80)
-stickyButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
-stickyButton.TextColor3 = Color3.fromRGB(255,255,255)
-stickyButton.Text = "Stick to Back"
-stickyButton.Font = Enum.Font.SourceSansBold
-stickyButton.TextScaled = true
-stickyButton.Parent = content
-
-local unstickButton = Instance.new("TextButton")
-unstickButton.Size = UDim2.new(1,-10,0,20)
-unstickButton.Position = UDim2.new(0,5,0,105)
-unstickButton.BackgroundColor3 = Color3.fromRGB(80,30,30)
-unstickButton.TextColor3 = Color3.fromRGB(255,255,255)
-unstickButton.Text = "Unstick"
-unstickButton.Font = Enum.Font.SourceSansBold
-unstickButton.TextScaled = true
-unstickButton.Parent = content
-
-stickyButton.MouseButton1Click:Connect(function()
-    local targetName = stickyBox.Text
-    local target = Players:FindFirstChild(targetName)
-    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-        stickyTarget = target
-        stickyActive = true
-
-        -- Auto unstick if they die/respawn
-        local hum = target.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.Died:Connect(function()
-                stickyTarget = nil
-                stickyActive = false
-            end)
+-- Fly + Stick follow
+RunService.RenderStepped:Connect(function()
+    if flying and hrp and humanoid then
+        local cam = Workspace.CurrentCamera
+        local look = cam.CFrame.LookVector
+        local right = cam.CFrame.RightVector
+        local horizLook = Vector3.new(look.X, 0, look.Z)
+        local forwardAxis = (horizLook.Magnitude > 0.001) and horizLook.Unit or Vector3.new(0,0,-1)
+        local rightAxis = Vector3.new(right.X, 0, right.Z)
+        rightAxis = (rightAxis.Magnitude > 0.001) and rightAxis.Unit or Vector3.new(1,0,0)
+        local moveDir = humanoid.MoveDirection
+        local forwardInput = moveDir:Dot(forwardAxis)
+        local rightInput = moveDir:Dot(rightAxis)
+        local desired = cam.CFrame.LookVector * forwardInput + cam.CFrame.RightVector * rightInput
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+            desired = desired - Vector3.new(0,1,0)
         end
-        target.CharacterAdded:Connect(function()
-            stickyTarget = nil
-            stickyActive = false
-        end)
-    else
-        stickyTarget = nil
-        stickyActive = false
+        hrp.AssemblyLinearVelocity = desired * flySpeed
+    end
+
+    if stickyActive and stickyTarget and stickyTarget.Character and stickyTarget.Character:FindFirstChild("HumanoidRootPart") then
+        local targetHRP = stickyTarget.Character.HumanoidRootPart
+        local backCFrame = targetHRP.CFrame * CFrame.new(0,0,stickOffset.Z)
+        hrp.CFrame = CFrame.new(backCFrame.Position, targetHRP.Position)
     end
 end)
 
-unstickButton.MouseButton1Click:Connect(function()
-    stickyTarget = nil
-    stickyActive = false
--- Invinsible
-createCheckbox("Invisible", 56, function(val)
-    if char then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                part.LocalTransparencyModifier = val and 1 or 0
-            elseif part:IsA("Decal") then
-                part.Transparency = val and 1 or 0
-            end
-        end
-    end
-end)
+-- Respawn update
+player.CharacterAdded:Connect(function(c)
+    char = c
+    hrp = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
 end)
