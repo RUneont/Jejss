@@ -293,7 +293,8 @@ local function refreshESP()
                     highlights[plr] = addHighlightToChar(ch)      
                 end      
             else      
-                if highlights[plr] and highlights[plr].Parent thenhighlights[plr]:Destroy()      
+                if highlights[plr] and highlights[plr].Parent then      
+                    highlights[plr]:Destroy()      
                 end      
                 highlights[plr] = nil      
             end      
@@ -326,38 +327,30 @@ RunService.RenderStepped:Connect(function()
     -- Sticky      
     if stickyActive and stickyTarget and stickyTarget.Character and stickyTarget.Character:FindFirstChild("HumanoidRootPart") and hrp then      
         local targetHRP = stickyTarget.Character.HumanoidRootPart      
-        -- closer stick with a small gap      
         local backCFrame = targetHRP.CFrame * CFrame.new(0, 0, stickOffset.Z)      
         hrp.CFrame = CFrame.new(backCFrame.Position, targetHRP.Position)      
     end      
 end)      
 
--- Cleanup highlights when players leave      
+-- Cleanup      
 Players.PlayerRemoving:Connect(function(plr)      
     if highlights[plr] then      
-        if highlights[plr].Parent then
-highlights[plr]:Destroy() end      
+        if highlights[plr].Parent then highlights[plr]:Destroy() end      
         highlights[plr] = nil      
     end      
 end)      
 
--- Update character references on respawn      
 player.CharacterAdded:Connect(function(c)      
     char = c      
     hrp = char:WaitForChild("HumanoidRootPart")      
     humanoid = char:WaitForChild("Humanoid")      
-    -- Restore invisibility state if needed      
-    if invisible then      
-        for desc,_ in pairs(originalProperties) do      
+
+    -- Restore invisibility if it was off      
+    if not invisible then      
+        for desc,transparency in pairs(originalProperties) do      
             if desc and desc.Parent then      
-                desc.Transparency = 1      
+                desc.Transparency = transparency      
             end      
         end      
-    else
-        for desc,trans in pairs(originalProperties) do
-            if desc and desc.Parent then
-                desc.Transparency = trans
-            end
-        end
-    end
+    end      
 end)
