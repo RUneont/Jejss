@@ -1,4 +1,4 @@
--- Free-fly + ESP + draggable GUI by @Ziggy
+-- Fly + ESP GUI by @Ziggy
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -9,8 +9,10 @@ local hrp = char:WaitForChild("HumanoidRootPart")
 local humanoid = char:WaitForChild("Humanoid")
 
 local flying = false
-local speed = 50
+local flySpeed = 50
+
 local espEnabled = false
+local espColor = Color3.fromRGB(0,255,0)
 local highlights = {}
 
 -- GUI
@@ -18,13 +20,13 @@ local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 180, 0, 100)
-frame.Position = UDim2.new(0.5, -90, 0.5, -50) -- centered
-frame.BackgroundColor3 = Color3.fromRGB(25,25,50)
+frame.Size = UDim2.new(0, 220, 0, 150)
+frame.Position = UDim2.new(0.5, -110, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
--- Developer watermark
+-- Watermark
 local watermark = Instance.new("TextLabel")
 watermark.Size = UDim2.new(1,0,0,20)
 watermark.Position = UDim2.new(0,0,0,0)
@@ -35,83 +37,7 @@ watermark.Font = Enum.Font.SourceSansBold
 watermark.TextScaled = true
 watermark.Parent = frame
 
--- Fly toggle button (small)
-local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0,80,0,30)
-flyButton.Position = UDim2.new(0,10,0,30)
-flyButton.Text = "Fly OFF"
-flyButton.Font = Enum.Font.SourceSansBold
-flyButton.TextColor3 = Color3.fromRGB(255,255,255)
-flyButton.BackgroundColor3 = Color3.fromRGB(0,170,255)
-flyButton.TextScaled = true
-flyButton.Parent = frame
-
-flyButton.MouseButton1Click:Connect(function()
-    flying = not flying
-    if flying then
-        flyButton.Text = "Fly ON"
-        humanoid.PlatformStand = true
-    else
-        flyButton.Text = "Fly OFF"
-        humanoid.PlatformStand = false
-    end
-end)
-
--- ESP toggle button (small)
-local espButton = Instance.new("TextButton")
-espButton.Size = UDim2.new(0,80,0,30)
-espButton.Position = UDim2.new(0,90,0,30)
-espButton.Text = "ESP OFF"
-espButton.Font = Enum.Font.SourceSansBold
-espButton.TextColor3 = Color3.fromRGB(255,255,255)
-espButton.BackgroundColor3 = Color3.fromRGB(0,255,0)
-espButton.TextScaled = true
-espButton.Parent = frame
-
-espButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    espButton.Text = espEnabled and "ESP ON" or "ESP OFF"
-    if espEnabled then
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local hrp2 = plr.Character:FindFirstChild("HumanoidRootPart")
-                if hrp2 and not highlights[plr] then
-                    local hl = Instance.new("Highlight")
-                    hl.Adornee = plr.Character
-                    hl.FillColor = Color3.fromRGB(0,255,0)
-                    hl.OutlineTransparency = 1
-                    hl.Parent = gui
-                    highlights[plr] = hl
-                end
-            end
-        end
-    else
-        for _, hl in pairs(highlights) do
-            hl:Destroy()
-        end
-        highlights = {}
-    end
-end)
-
--- Update ESP for new players joining
-Players.PlayerAdded:Connect(function(plr)
-    plr.CharacterAdded:Connect(function(char)
-        if espEnabled then
-            task.wait(0.5) -- wait for HumanoidRootPart to exist
-            local hrp2 = char:FindFirstChild("HumanoidRootPart")
-            if hrp2 and not highlights[plr] then
-                local hl = Instance.new("Highlight")
-                hl.Adornee = char
-                hl.FillColor = Color3.fromRGB(0,255,0)
-                hl.OutlineTransparency = 1
-                hl.Parent = gui
-                highlights[plr] = hl
-            end
-        end
-    end)
-end)
-
--- Draggable GUI (classic)
+-- Draggable GUI
 do
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
@@ -142,6 +68,101 @@ do
     end)
 end
 
+-- Fly toggle button
+local flyButton = Instance.new("TextButton")
+flyButton.Size = UDim2.new(0,100,0,30)
+flyButton.Position = UDim2.new(0,10,0,30)
+flyButton.Text = "Fly OFF"
+flyButton.Font = Enum.Font.SourceSansBold
+flyButton.TextColor3 = Color3.fromRGB(255,255,255)
+flyButton.BackgroundColor3 = Color3.fromRGB(0,170,255)
+flyButton.TextScaled = true
+flyButton.Parent = frame
+
+flyButton.MouseButton1Click:Connect(function()
+    flying = not flying
+    if flying then
+        flyButton.Text = "Fly ON"
+        humanoid.PlatformStand = true
+    else
+        flyButton.Text = "Fly OFF"
+        humanoid.PlatformStand = false
+    end
+end)
+
+-- ESP checkbox
+local espCheck = Instance.new("TextButton")
+espCheck.Size = UDim2.new(0,80,0,30)
+espCheck.Position = UDim2.new(0,10,0,70)
+espCheck.Text = "ESP OFF"
+espCheck.Font = Enum.Font.SourceSansBold
+espCheck.TextColor3 = Color3.fromRGB(255,255,255)
+espCheck.BackgroundColor3 = Color3.fromRGB(50,50,50)
+espCheck.TextScaled = true
+espCheck.Parent = frame
+
+espCheck.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    espCheck.Text = espEnabled and "ESP ON" or "ESP OFF"
+    if not espEnabled then
+        for _, hl in pairs(highlights) do
+            hl:Destroy()
+        end
+        highlights = {}
+    end
+end)
+
+-- ESP color picker (simple)
+local colorBox = Instance.new("TextButton")
+colorBox.Size = UDim2.new(0,120,0,30)
+colorBox.Position = UDim2.new(0,10,0,110)
+colorBox.Text = "ESP Color"
+colorBox.Font = Enum.Font.SourceSansBold
+colorBox.TextColor3 = espColor
+colorBox.BackgroundColor3 = Color3.fromRGB(20,20,20)
+colorBox.TextScaled = true
+colorBox.Parent = frame
+
+colorBox.MouseButton1Click:Connect(function()
+    -- cycle through some preset colors
+    local colors = {Color3.fromRGB(0,255,0), Color3.fromRGB(255,0,0), Color3.fromRGB(0,0,255), Color3.fromRGB(255,255,0), Color3.fromRGB(255,255,255)}
+    local currentIndex = 1
+    for i,c in pairs(colors) do
+        if c == espColor then currentIndex = i end
+    end
+    espColor = colors[currentIndex % #colors + 1]
+    colorBox.TextColor3 = espColor
+end)
+
+-- ESP updater
+local function updateESP()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if espEnabled then
+                if not highlights[plr] then
+                    local hl = Instance.new("Highlight")
+                    hl.Adornee = plr.Character
+                    hl.FillColor = espColor
+                    hl.FillTransparency = 1
+                    hl.OutlineColor = espColor
+                    hl.OutlineTransparency = 0
+                    hl.Parent = gui
+                    highlights[plr] = hl
+                else
+                    highlights[plr].OutlineColor = espColor
+                end
+            else
+                if highlights[plr] then
+                    highlights[plr]:Destroy()
+                    highlights[plr] = nil
+                end
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(updateESP)
+
 -- Fly movement
 RunService.RenderStepped:Connect(function(delta)
     if flying then
@@ -155,7 +176,11 @@ RunService.RenderStepped:Connect(function(delta)
         if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
 
         if dir.Magnitude > 0 then
-            hrp.CFrame += dir.Unit * speed * delta
+            hrp.Velocity = dir.Unit * flySpeed
+        else
+            hrp.Velocity = Vector3.new(0,0,0)
         end
+    else
+        hrp.Velocity = Vector3.new(0,0,0)
     end
 end)
