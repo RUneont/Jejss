@@ -1,51 +1,35 @@
+-- Simple Fly GUI, exactly like previous GUI style
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 
--- Wait for PlayerGui to exist
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
--- GUI variables
 local flying = false
 local speed = 50
 local bp
 
--- Create ScreenGui
+-- GUI Setup
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FlyGUI_Ziggy"
+screenGui.Name = "FlyGUI"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = PlayerGui
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") -- parent to PlayerGui
 
--- Main Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 180)
-mainFrame.Position = UDim2.new(0.5, -125, 0.3, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(35,35,35)
-mainFrame.BorderSizePixel = 0
-mainFrame.Parent = screenGui
+-- Main draggable frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 250, 0, 180)
+frame.Position = UDim2.new(0.5, -125, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
 
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,12)
-
--- Developer Watermark
-local watermark = Instance.new("TextLabel")
-watermark.Size = UDim2.new(1,0,0,25)
-watermark.Position = UDim2.new(0,0,0,0)
-watermark.BackgroundTransparency = 1
-watermark.Text = "Developer: @Ziggy"
-watermark.TextColor3 = Color3.fromRGB(255,255,255)
-watermark.Font = Enum.Font.GothamBold
-watermark.TextSize = 14
-watermark.Parent = mainFrame
-
--- Make GUI draggable
-local dragging, dragInput, dragStart, startPos
-mainFrame.InputBegan:Connect(function(input)
+-- Draggable function
+local dragging = false
+local dragInput, dragStart, startPos
+frame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
-        startPos = mainFrame.Position
+        startPos = frame.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
@@ -53,7 +37,7 @@ mainFrame.InputBegan:Connect(function(input)
         end)
     end
 end)
-mainFrame.InputChanged:Connect(function(input)
+frame.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement then
         dragInput = input
     end
@@ -61,38 +45,41 @@ end)
 UIS.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                    startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- Fly toggle button
+-- Developer watermark
+local watermark = Instance.new("TextLabel")
+watermark.Size = UDim2.new(1,0,0,25)
+watermark.Position = UDim2.new(0,0,0,0)
+watermark.BackgroundTransparency = 1
+watermark.Text = "Developer: @Ziggy"
+watermark.TextColor3 = Color3.fromRGB(255,255,255)
+watermark.Font = Enum.Font.SourceSansBold
+watermark.TextSize = 14
+watermark.Parent = frame
+
+-- Fly Toggle Button
 local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0,200,0,50)
-flyButton.Position = UDim2.new(0.5,-100,0,40)
+flyButton.Size = UDim2.new(0, 200, 0, 50)
+flyButton.Position = UDim2.new(0.5, -100, 0, 50)
+flyButton.Text = "Fly OFF"
 flyButton.BackgroundColor3 = Color3.fromRGB(0,170,255)
 flyButton.TextColor3 = Color3.fromRGB(255,255,255)
-flyButton.Font = Enum.Font.GothamBold
-flyButton.TextSize = 16
-flyButton.Text = "Fly OFF"
-flyButton.Parent = mainFrame
-Instance.new("UICorner", flyButton).CornerRadius = UDim.new(0,10)
+flyButton.Parent = frame
 
--- Speed input box
+-- Speed TextBox
 local speedBox = Instance.new("TextBox")
 speedBox.Size = UDim2.new(0,200,0,40)
-speedBox.Position = UDim2.new(0.5,-100,0,100)
-speedBox.PlaceholderText = "Fly Speed"
+speedBox.Position = UDim2.new(0.5,-100,0,120)
 speedBox.Text = tostring(speed)
+speedBox.PlaceholderText = "Fly Speed"
 speedBox.ClearTextOnFocus = false
-speedBox.BackgroundColor3 = Color3.fromRGB(0,255,128)
-speedBox.TextColor3 = Color3.fromRGB(0,0,0)
-speedBox.Font = Enum.Font.GothamBold
-speedBox.TextSize = 16
-speedBox.Parent = mainFrame
-Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0,10)
+speedBox.Parent = frame
 
--- Fly functionality
+-- Fly toggle functionality
 flyButton.MouseButton1Click:Connect(function()
     flying = not flying
     local char = LocalPlayer.Character
