@@ -1,61 +1,67 @@
--- Compact Fly GUI by @Ziggy
+-- Fly Script with Themed Toggleable GUI by @Ziggy
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 
-local flying = false
-local speed = 50
-local bp
+-- Fly settings
+local flightPower = 50
+local maxFlightPower = 100
+local minFlightPower = 10
+local speedIncrement = 5
+local isFlying = false
 
--- Wait for PlayerGui
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+-- Player and Character
+local player = LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+local mouse = player:GetMouse()
 
--- GUI setup
+-- Body Movers
+local bodyPosition = Instance.new("BodyPosition")
+bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+local bodyGyro = Instance.new("BodyGyro")
+bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+
+-- ScreenGui
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FlyGUI_Ziggy"
+screenGui.Parent = player:WaitForChild("PlayerGui")
 screenGui.ResetOnSpawn = false
-screenGui.Parent = PlayerGui
 
--- Small, compact draggable frame
+-- Main frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0,180,0,120)
-frame.Position = UDim2.new(0.5,-90,0.3,0)
-frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+frame.Size = UDim2.new(0, 200, 0, 180)
+frame.Position = UDim2.new(0.8, 0, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,40)
 frame.BorderSizePixel = 0
 frame.Parent = screenGui
 
--- Draggable
-local dragging = false
-local dragInput, dragStart, startPos
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-frame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-UIS.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                    startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+-- Arrow button to toggle GUI
+local arrowButton = Instance.new("TextButton")
+arrowButton.Size = UDim2.new(0, 30, 0, 30)
+arrowButton.Position = UDim2.new(1, -30, 0, 0)
+arrowButton.Text = "▶"
+arrowButton.TextScaled = true
+arrowButton.Font = Enum.Font.SourceSansBold
+arrowButton.BackgroundColor3 = Color3.fromRGB(255,128,0)
+arrowButton.TextColor3 = Color3.fromRGB(255,255,255)
+arrowButton.Parent = frame
+
+local isOpen = true
+arrowButton.MouseButton1Click:Connect(function()
+    isOpen = not isOpen
+    if isOpen then
+        frame.Size = UDim2.new(0, 200, 0, 180)
+        arrowButton.Text = "▶"
+    else
+        frame.Size = UDim2.new(0, 30, 0, 30)
+        arrowButton.Text = "◀"
     end
 end)
 
 -- Developer watermark
 local watermark = Instance.new("TextLabel")
-watermark.Size = UDim2.new(1,0,0,20)
+watermark.Size = UDim2.new(1, 0, 0, 20)
 watermark.Position = UDim2.new(0,0,0,0)
 watermark.BackgroundTransparency = 1
 watermark.Text = "Developer: @Ziggy"
@@ -66,8 +72,8 @@ watermark.Parent = frame
 
 -- Fly toggle button
 local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0,160,0,40)
-flyButton.Position = UDim2.new(0.5,-80,0,30)
+flyButton.Size = UDim2.new(0, 160, 0, 40)
+flyButton.Position = UDim2.new(0.5,-80,0,40)
 flyButton.BackgroundColor3 = Color3.fromRGB(0,170,255)
 flyButton.TextColor3 = Color3.fromRGB(255,255,255)
 flyButton.Font = Enum.Font.SourceSansBold
@@ -75,67 +81,68 @@ flyButton.TextSize = 16
 flyButton.Text = "Fly OFF"
 flyButton.Parent = frame
 
--- Speed input box
-local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(0,160,0,30)
-speedBox.Position = UDim2.new(0.5,-80,0,80)
-speedBox.PlaceholderText = "Fly Speed"
-speedBox.Text = tostring(speed)
-speedBox.ClearTextOnFocus = false
-speedBox.BackgroundColor3 = Color3.fromRGB(0,255,128)
-speedBox.TextColor3 = Color3.fromRGB(0,0,0)
-speedBox.Font = Enum.Font.SourceSansBold
-speedBox.TextSize = 14
-speedBox.Parent = frame
+-- Flight power display
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0, 160, 0, 30)
+statusLabel.Position = UDim2.new(0.5, -80, 0, 100)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(255,255,255)
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.Text = "Flight Power: "..flightPower
+statusLabel.Parent = frame
 
--- Fly functionality
+-- Fly functions
+local function activateFly()
+    if not torso then return end
+    bodyPosition.Parent = torso
+    bodyGyro.Parent = torso
+    character.Humanoid.PlatformStand = true
+    isFlying = true
+    flyButton.Text = "Fly ON"
+end
+
+local function deactivateFly()
+    bodyPosition.Parent = nil
+    bodyGyro.Parent = nil
+    character.Humanoid.PlatformStand = false
+    isFlying = false
+    flyButton.Text = "Fly OFF"
+end
+
 flyButton.MouseButton1Click:Connect(function()
-    flying = not flying
-    local char = LocalPlayer.Character
-    local HRP = char and char:FindFirstChild("HumanoidRootPart")
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    if flying then
-        flyButton.Text = "Fly ON"
-        if HRP then
-            bp = Instance.new("BodyVelocity")
-            bp.MaxForce = Vector3.new(1e5,1e5,1e5)
-            bp.Velocity = Vector3.new(0,0,0)
-            bp.Parent = HRP
-            if humanoid then humanoid.PlatformStand = true end
-        end
+    if isFlying then
+        deactivateFly()
     else
-        flyButton.Text = "Fly OFF"
-        if bp then bp:Destroy() end
-        if humanoid then humanoid.PlatformStand = false end
+        activateFly()
     end
 end)
 
--- Update speed
-speedBox.FocusLost:Connect(function()
-    local val = tonumber(speedBox.Text)
-    if val and val > 0 then speed = val
-    else speedBox.Text = tostring(speed) end
+-- Update flight power with arrow keys
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Up then
+        flightPower = math.min(flightPower + speedIncrement, maxFlightPower)
+    elseif input.KeyCode == Enum.KeyCode.Down then
+        flightPower = math.max(flightPower - speedIncrement, minFlightPower)
+    end
+    statusLabel.Text = "Flight Power: "..flightPower
 end)
 
--- Fly movement (smooth, no sticking)
+-- Fly movement
 RunService.RenderStepped:Connect(function(delta)
-    if flying and bp then
-        local char = LocalPlayer.Character
-        local HRP = char and char:FindFirstChild("HumanoidRootPart")
-        if HRP then
-            local dir = Vector3.new()
-            if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + workspace.CurrentCamera.CFrame.LookVector end
-            if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - workspace.CurrentCamera.CFrame.LookVector end
-            if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - workspace.CurrentCamera.CFrame.RightVector end
-            if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + workspace.CurrentCamera.CFrame.RightVector end
-            if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
-            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0,1,0) end
-
-            if dir.Magnitude > 0 then
-                bp.Velocity = dir.Unit * speed
-            else
-                bp.Velocity = Vector3.new(0,0,0)
-            end
+    if isFlying and torso then
+        local moveDir = Vector3.new()
+        local cam = workspace.CurrentCamera
+        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
+        if moveDir.Magnitude > 0 then
+            bodyPosition.Position = torso.Position + moveDir.Unit * flightPower
+            bodyGyro.CFrame = CFrame.new(torso.Position, torso.Position + moveDir)
         end
     end
 end)
