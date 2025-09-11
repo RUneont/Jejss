@@ -1,4 +1,4 @@
--- Brookhaven Sky-Walk Fly GUI (Movable + Colorful + Developer @Ziggy)
+-- Guaranteed visible Fly GUI for Brookhaven
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -9,18 +9,17 @@ local speed = 50
 local bp
 
 -- GUI Setup
-local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FlyGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") -- Make sure parent is PlayerGui
 
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Size = UDim2.new(0, 250, 0, 180)
 mainFrame.Position = UDim2.new(0.5, -125, 0.3, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 mainFrame.BorderSizePixel = 0
-mainFrame.ClipsDescendants = true
-mainFrame.AnchorPoint = Vector2.new(0.5,0)
 
--- Rounded corners
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,12)
 
 -- Developer watermark
@@ -33,7 +32,7 @@ watermark.TextColor3 = Color3.fromRGB(255,255,255)
 watermark.Font = Enum.Font.GothamBold
 watermark.TextSize = 14
 
--- Make GUI draggable
+-- Movable GUI
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -60,11 +59,11 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
--- Fly Toggle Button
+-- Fly Toggle
 local flyButton = Instance.new("TextButton", mainFrame)
 flyButton.Size = UDim2.new(0, 200, 0, 50)
 flyButton.Position = UDim2.new(0.5, -100, 0, 40)
-flyButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+flyButton.BackgroundColor3 = Color3.fromRGB(0,170,255)
 flyButton.TextColor3 = Color3.fromRGB(255,255,255)
 flyButton.Font = Enum.Font.GothamBold
 flyButton.TextSize = 16
@@ -84,7 +83,7 @@ speedBox.Font = Enum.Font.GothamBold
 speedBox.TextSize = 16
 Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0,10)
 
--- Fly Toggle functionality
+-- Fly functionality
 flyButton.MouseButton1Click:Connect(function()
     flying = not flying
     local char = LocalPlayer.Character
@@ -99,30 +98,23 @@ flyButton.MouseButton1Click:Connect(function()
             bp.P = 5000
             bp.Position = HRP.Position
             bp.Parent = HRP
-            if humanoid then
-                humanoid.PlatformStand = true
-            end
+            if humanoid then humanoid.PlatformStand = true end
         end
     else
         flyButton.Text = "Fly OFF"
         if bp then bp:Destroy() end
-        if humanoid then
-            humanoid.PlatformStand = false
-        end
+        if humanoid then humanoid.PlatformStand = false end
     end
 end)
 
 -- Update speed
 speedBox.FocusLost:Connect(function()
     local val = tonumber(speedBox.Text)
-    if val and val > 0 then
-        speed = val
-    else
-        speedBox.Text = tostring(speed)
-    end
+    if val and val > 0 then speed = val
+    else speedBox.Text = tostring(speed) end
 end)
 
--- Fly movement (WASD + Space/Shift)
+-- Fly movement
 RunService.RenderStepped:Connect(function()
     if flying and bp then
         local char = LocalPlayer.Character
@@ -140,43 +132,6 @@ RunService.RenderStepped:Connect(function()
                 bp.Position = HRP.Position + dir.Unit * speed * RunService.RenderStepped:Wait()
             else
                 bp.Position = HRP.Position
-            end
-        end
-    end
-end)    else
-        flyButton.Text = "Fly OFF"
-        if bv then bv:Destroy() end
-    end
-end)
-
--- Update Speed
-speedBox.FocusLost:Connect(function()
-    local val = tonumber(speedBox.Text)
-    if val and val > 0 then
-        speed = val
-    else
-        speedBox.Text = tostring(speed)
-    end
-end)
-
--- Fly Movement
-RunService.RenderStepped:Connect(function()
-    if flying and bv then
-        local character = LocalPlayer.Character
-        local HRP = character and character:FindFirstChild("HumanoidRootPart")
-        if HRP then
-            local dir = Vector3.new()
-            if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + workspace.CurrentCamera.CFrame.LookVector end
-            if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - workspace.CurrentCamera.CFrame.LookVector end
-            if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - workspace.CurrentCamera.CFrame.RightVector end
-            if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + workspace.CurrentCamera.CFrame.RightVector end
-            if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
-            if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0,1,0) end
-
-            if dir.Magnitude > 0 then
-                bv.Velocity = dir.Unit * speed
-            else
-                bv.Velocity = Vector3.new(0,0,0)
             end
         end
     end
