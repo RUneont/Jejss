@@ -1,188 +1,233 @@
---// Ziggy's Fly + ESP Menu (Safe Re-exec Version)
-
--- remove old GUI if re-executed
-local oldGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyModMenu")
-if oldGui then
-    oldGui:Destroy()
-end
-
+-- @Ziggy Collapsible Fly+ESP Menu (camera-based flight, keeps draggable menu)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
--- GUI setup
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ZiggyModMenu"
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 180, 0, 120)
-mainFrame.Position = UDim2.new(0.5, -90, 0.3, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-mainFrame.BorderSizePixel = 2
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
-
--- Title
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 25)
-title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-title.Text = "▼ Mod Menu"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextScaled = true
-title.Parent = mainFrame
-
--- Collapse toggle
-local collapsed = false
-title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        collapsed = not collapsed
-        if collapsed then
-            title.Text = "▲ Mod Menu"
-            for _, obj in ipairs(mainFrame:GetChildren()) do
-                if obj ~= title then obj.Visible = false end
-            end
-            mainFrame.Size = UDim2.new(0, 180, 0, 25)
-        else
-            title.Text = "▼ Mod Menu"
-            for _, obj in ipairs(mainFrame:GetChildren()) do
-                if obj ~= title then obj.Visible = true end
-            end
-            mainFrame.Size = UDim2.new(0, 180, 0, 120)
-        end
-    end
-end)
-
--- Checkbox function
-local function createCheckbox(name, yPos)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -10, 0, 25)
-    button.Position = UDim2.new(0, 5, 0, yPos)
-    button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextScaled = true
-    button.Text = "[ ] " .. name
-    button.Parent = mainFrame
-    return button
-end
-
--- Fly variables
+-- Settings
 local flying = false
-local flySpeed = 50
-
--- ESP variables
+local flySpeed = 50 -- tweak this to taste
 local espEnabled = false
+local espColor = Color3.fromRGB(0,255,0)
 local highlights = {}
 
--- Fly function
-local function setFlying(state)
-    flying = state
-    if flying then
-        spawn(function()
-            while flying do
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local moveDir = Vector3.new(0, 0, 0)
-                    local camCF = Camera.CFrame
-                    local dir = Vector3.new()
-
-                    -- WASD/Joystick movement
-                    dir = camCF:VectorToWorldSpace(Vector3.new(
-                        UserInputService:IsKeyDown(Enum.KeyCode.A) and -1 or (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0),
-                        0,
-                        UserInputService:IsKeyDown(Enum.KeyCode.W) and -1 or (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
-                    ))
-
-                    -- Vertical (Space = up, Shift = down)
-                    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                        dir = dir + Vector3.new(0,1,0)
-                    end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-                        dir = dir + Vector3.new(0,-1,0)
-                    end
-
-                    -- Mobile support: JumpButton = up
-                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-                        if LocalPlayer.Character.Humanoid.Jump then
-                            dir = dir + Vector3.new(0,1,0)
-                        end
-                    end
-
-                    if dir.Magnitude > 0 then
-                        hrp.AssemblyLinearVelocity = dir.Unit * flySpeed
-                    else
-                        hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                    end
-                end
-                RunService.RenderStepped:Wait()
-            end
-        end)
-    end
+-- ✅ Prevent duplicate GUI
+if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then
+    player.PlayerGui.ZiggyMenu:Destroy()
 end
 
--- ESP function
-local function setESP(state)
-    espEnabled = state
-    if espEnabled then
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                local char = plr.Character
-                if char and not highlights[plr] then
-                    local highlight = Instance.new("Highlight")
-                    highlight.FillTransparency = 1
-                    highlight.OutlineColor = Color3.fromRGB(0,255,0)
-                    highlight.OutlineTransparency = 0
-                    highlight.Parent = char
-                    highlights[plr] = highlight
-                end
-            end
-        end
-        Players.PlayerAdded:Connect(function(plr)
-            plr.CharacterAdded:Connect(function(char)
-                if espEnabled then
-                    local highlight = Instance.new("Highlight")
-                    highlight.FillTransparency = 1
-                    highlight.OutlineColor = Color3.fromRGB(0,255,0)
-                    highlight.OutlineTransparency = 0
-                    highlight.Parent = char
-                    highlights[plr] = highlight
-                end
-            end)
-        end)
-    else
-        for plr, h in pairs(highlights) do
-            if h then h:Destroy() end
-            highlights[plr] = nil
-        end
-    end
-end
+-- GUI (keeps your drag exactly the same)
+local gui = Instance.new("ScreenGui")
+gui.Name = "ZiggyMenu"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
--- Buttons
-local flyBtn = createCheckbox("Fly", 30)
-local espBtn = createCheckbox("ESP", 60)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 150, 0, 30) -- collapsed
+frame.Position = UDim2.new(0.5, -75, 0.5, -15)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true   -- <<< kept exactly as you wanted
+frame.Parent = gui
 
-flyBtn.MouseButton1Click:Connect(function()
-    flying = not flying
-    flyBtn.Text = (flying and "[x] " or "[ ] ") .. "Fly"
-    setFlying(flying)
-end)
+-- Title / watermark
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,0)
+title.BackgroundTransparency = 1
+title.Text = "Mod Menu ▼"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Font = Enum.Font.SourceSansBold
+title.TextScaled = true
+title.Parent = frame
 
-espBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    espBtn.Text = (espEnabled and "[x] " or "[ ] ") .. "ESP"
-    setESP(espEnabled)
-end)
-
--- Watermark
 local watermark = Instance.new("TextLabel")
-watermark.Size = UDim2.new(1, 0, 0, 20)
-watermark.Position = UDim2.new(0, 0, 1, -20)
+watermark.Size = UDim2.new(1,0,0,15)
+watermark.Position = UDim2.new(0,0,1,0)
 watermark.BackgroundTransparency = 1
 watermark.Text = "@Ziggy"
-watermark.TextColor3 = Color3.fromRGB(200, 200, 200)
+watermark.TextColor3 = Color3.fromRGB(150,150,150)
+watermark.Font = Enum.Font.SourceSansItalic
 watermark.TextScaled = true
-watermark.Parent = mainFrame
+watermark.Parent = frame
+
+local expanded = false
+
+-- Collapsible content
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,0,0,50)
+content.Position = UDim2.new(0,0,0,30)
+content.BackgroundTransparency = 1
+content.Visible = false
+content.Parent = frame
+
+-- expand / collapse (keeps your behavior)
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        expanded = not expanded
+        content.Visible = expanded
+        frame.Size = expanded and UDim2.new(0,150,0,80) or UDim2.new(0,150,0,30)
+        title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
+    end
+end)
+
+-- checkbox helper: square box + checkmark ✔
+local function createCheckbox(text, yPos, callback)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1,0,0,20)
+    holder.Position = UDim2.new(0,0,0,yPos)
+    holder.BackgroundTransparency = 1
+    holder.Parent = content
+
+    local box = Instance.new("TextButton")
+    box.Name = "Box"
+    box.Size = UDim2.new(0,18,0,18)
+    box.Position = UDim2.new(0,6,0,1)
+    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    box.BorderSizePixel = 0
+    box.Text = ""
+    box.AutoButtonColor = false
+    box.Parent = holder
+
+    local check = Instance.new("TextLabel")
+    check.Size = UDim2.new(1,0,1,0)
+    check.Position = UDim2.new(0,0,0,0)
+    check.BackgroundTransparency = 1
+    check.Text = "✔"               -- actual checkmark
+    check.TextColor3 = Color3.fromRGB(0,220,0)
+    check.Visible = false
+    check.Font = Enum.Font.SourceSansBold
+    check.TextScaled = true
+    check.Parent = box
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,-30,1,0)
+    label.Position = UDim2.new(0,30,0,0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextScaled = true
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = holder
+
+    local state = false
+    box.MouseButton1Click:Connect(function()
+        state = not state
+        check.Visible = state
+        callback(state)
+    end)
+    label.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state = not state
+            check.Visible = state
+            callback(state)
+        end
+    end)
+end
+
+-- create checkboxes
+createCheckbox("Fly", 0, function(val)
+    flying = val
+    -- do NOT change PlatformStand; keep animations natural and avoid autorotate
+    if not val then
+        if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end
+    end
+end)
+
+createCheckbox("ESP", 28, function(val)
+    espEnabled = val
+    if not val then
+        for _,hl in pairs(highlights) do
+            if hl and hl.Parent then hl:Destroy() end
+        end
+        highlights = {}
+    end
+end)
+
+-- ESP helpers
+local function addHighlightToChar(charModel)
+    if not charModel or not charModel:IsA("Model") then return end
+    if charModel:FindFirstChild("ESP_Highlight") then return end
+    local hl = Instance.new("Highlight")
+    hl.Name = "ESP_Highlight"
+    hl.Adornee = charModel
+    hl.Parent = charModel
+    hl.FillTransparency = 1
+    hl.OutlineColor = espColor
+    hl.OutlineTransparency = 0
+    return hl
+end
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(ch)
+        if espEnabled and plr ~= player then
+            highlights[plr] = addHighlightToChar(ch)
+        end
+    end)
+end)
+
+local function refreshESP()
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local ch = plr.Character
+            if espEnabled then
+                if ch and not highlights[plr] then
+                    highlights[plr] = addHighlightToChar(ch)
+                end
+            else
+                if highlights[plr] and highlights[plr].Parent then
+                    highlights[plr]:Destroy()
+                end
+                highlights[plr] = nil
+            end
+        end
+    end
+end
+RunService.RenderStepped:Connect(refreshESP)
+
+-- FLY: camera-based
+RunService.RenderStepped:Connect(function()
+    if not flying then return end
+    if not hrp or not humanoid then return end
+    local cam = Workspace.CurrentCamera
+    if not cam then return end
+
+    local look = cam.CFrame.LookVector
+    local right = cam.CFrame.RightVector
+    local horizLook = Vector3.new(look.X, 0, look.Z)
+    local forwardAxis = (horizLook.Magnitude > 0.001) and horizLook.Unit or Vector3.new(0,0,-1)
+    local rightAxis = Vector3.new(right.X, 0, right.Z)
+    rightAxis = (rightAxis.Magnitude > 0.001) and rightAxis.Unit or Vector3.new(1,0,0)
+
+    local moveDir = humanoid.MoveDirection
+    local forwardInput = moveDir:Dot(forwardAxis)
+    local rightInput = moveDir:Dot(rightAxis)
+
+    local desired = cam.CFrame.LookVector * forwardInput + cam.CFrame.RightVector * rightInput
+    if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+        desired = desired - Vector3.new(0,1,0) * 1
+    end
+
+    local finalVel = desired * flySpeed
+    hrp.AssemblyLinearVelocity = finalVel
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    if highlights[plr] then
+        if highlights[plr].Parent then highlights[plr]:Destroy() end
+        highlights[plr] = nil
+    end
+end)
+
+player.CharacterAdded:Connect(function(c)
+    char = c
+    hrp = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
+end)
