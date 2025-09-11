@@ -3,12 +3,12 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")      
 local UIS = game:GetService("UserInputService")      
 local Workspace = game:GetService("Workspace")      
-
+      
 local player = Players.LocalPlayer      
 local char = player.Character or player.CharacterAdded:Wait()      
 local hrp = char:WaitForChild("HumanoidRootPart")      
 local humanoid = char:WaitForChild("Humanoid")      
-
+      
 -- Settings      
 local flying = false      
 local flySpeed = 50      
@@ -17,24 +17,22 @@ local espColor = Color3.fromRGB(255,105,180)
 local highlights = {}      
 local stickyTarget = nil      
 local stickyActive = false      
-local stickOffset = Vector3.new(0,0,3)      
+local stickOffset = Vector3.new(0,0,1.5) -- closer gap      
 local invisible = false      
 local noclip = false      
-
--- Table to save original properties      
-local originalProps = {}      
-
+local originalTransparency = {}      
+      
 -- Prevent duplicate GUI      
 if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then      
     player.PlayerGui.ZiggyMenu:Destroy()      
 end      
-
+      
 -- GUI      
 local gui = Instance.new("ScreenGui")      
 gui.Name = "ZiggyMenu"      
 gui.ResetOnSpawn = false      
 gui.Parent = player:WaitForChild("PlayerGui")      
-
+      
 local frame = Instance.new("Frame")      
 frame.Size = UDim2.new(0, 160, 0, 30)      
 frame.Position = UDim2.new(0.5, -80, 0.5, -15)      
@@ -43,7 +41,7 @@ frame.BorderSizePixel = 0
 frame.Active = true      
 frame.Draggable = true      
 frame.Parent = gui      
-
+      
 local title = Instance.new("TextLabel")      
 title.Size = UDim2.new(1,0,0,30)      
 title.Position = UDim2.new(0,0,0,0)      
@@ -53,7 +51,7 @@ title.TextColor3 = Color3.fromRGB(255,255,255)
 title.Font = Enum.Font.SourceSansBold      
 title.TextScaled = true      
 title.Parent = frame      
-
+      
 local expanded = false      
 local content = Instance.new("Frame")      
 content.Size = UDim2.new(1,0,0,200)      
@@ -61,7 +59,7 @@ content.Position = UDim2.new(0,0,0,30)
 content.BackgroundTransparency = 1      
 content.Visible = false      
 content.Parent = frame      
-
+      
 title.InputBegan:Connect(function(input)      
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then      
         expanded = not expanded      
@@ -70,7 +68,7 @@ title.InputBegan:Connect(function(input)
         title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"      
     end      
 end)      
-
+      
 -- Checkbox helper      
 local function createCheckbox(text, yPos, callback)      
     local holder = Instance.new("Frame")      
@@ -78,7 +76,7 @@ local function createCheckbox(text, yPos, callback)
     holder.Position = UDim2.new(0,0,0,yPos)      
     holder.BackgroundTransparency = 1      
     holder.Parent = content      
-
+      
     local box = Instance.new("TextButton")      
     box.Size = UDim2.new(0,18,0,18)      
     box.Position = UDim2.new(0,6,0,1)      
@@ -87,7 +85,7 @@ local function createCheckbox(text, yPos, callback)
     box.Text = ""      
     box.AutoButtonColor = false      
     box.Parent = holder      
-
+      
     local check = Instance.new("TextLabel")      
     check.Size = UDim2.new(1,0,1,0)      
     check.BackgroundTransparency = 1      
@@ -97,7 +95,7 @@ local function createCheckbox(text, yPos, callback)
     check.Font = Enum.Font.SourceSansBold      
     check.TextScaled = true      
     check.Parent = box      
-
+      
     local label = Instance.new("TextLabel")      
     label.Size = UDim2.new(1,-30,1,0)      
     label.Position = UDim2.new(0,30,0,0)      
@@ -108,7 +106,7 @@ local function createCheckbox(text, yPos, callback)
     label.TextScaled = true      
     label.TextXAlignment = Enum.TextXAlignment.Left      
     label.Parent = holder      
-
+      
     local state = false      
     local function toggle()      
         state = not state      
@@ -122,7 +120,7 @@ local function createCheckbox(text, yPos, callback)
         end      
     end)      
 end      
-
+      
 -- Fly Checkbox      
 createCheckbox("Fly", 0, function(val)      
     flying = val      
@@ -134,32 +132,16 @@ createCheckbox("ESP", 28, function(val)
     espEnabled = val      
 end)      
 
--- Invisible Checkbox (fixed)      
+-- Invisible Checkbox      
 createCheckbox("Invisible", 56, function(val)      
-    invisible = val
-    if val then
-        -- Save original properties
-        originalProps = {}
-        for _,desc in pairs(char:GetDescendants()) do
-            if desc:IsA("BasePart") or desc:IsA("MeshPart") or desc:IsA("Accessory") or desc:IsA("UnionOperation") then
-                originalProps[desc] = {Transparency = desc.Transparency, Material = desc.Material, Color = desc.Color}
-                desc.Transparency = 1
-            elseif desc:IsA("Decal") or desc:IsA("Texture") then
-                originalProps[desc] = {Transparency = desc.Transparency}
-                desc.Transparency = 1
-            end
-        end
-    else
-        -- Restore original properties
-        for desc, props in pairs(originalProps) do
-            if desc and desc.Parent then
-                for k,v in pairs(props) do
-                    desc[k] = v
-                end
-            end
-        end
-        originalProps = {}
-    end
+    invisible = val      
+    originalTransparency = {}      
+    for _,desc in pairs(char:GetDescendants()) do      
+        if desc:IsA("BasePart") or desc:IsA("Decal") or desc:IsA("Clothing") or desc:IsA("ShirtGraphic") or desc:IsA("Accessory") or desc:IsA("MeshPart") then      
+            originalTransparency[desc] = desc.Transparency      
+            desc.Transparency = val and 1 or originalTransparency[desc]      
+        end      
+    end      
 end)      
 
 -- Wallhack Checkbox (noclip)      
@@ -214,8 +196,7 @@ targetLabel.BackgroundTransparency = 1
 targetLabel.TextColor3 = Color3.fromRGB(255,255,255)      
 targetLabel.Font = Enum.Font.SourceSans      
 targetLabel.TextScaled = true      
-targetLabel.Parent = selectorFrame      
-
+targetLabel.Parent = selectorFrame
 local function updateTargetLabel()      
     if #playerList > 0 then      
         targetLabel.Text = "Target: "..playerList[currentIndex].Name      
@@ -372,8 +353,17 @@ Players.PlayerRemoving:Connect(function(plr)
     end      
 end)      
 
+-- Character Added (restore properly)      
 player.CharacterAdded:Connect(function(c)      
     char = c      
     hrp = char:WaitForChild("HumanoidRootPart")      
     humanoid = char:WaitForChild("Humanoid")      
+    -- Restore invisibility state if needed      
+    if invisible then      
+        for _,desc in pairs(char:GetDescendants()) do      
+            if desc:IsA("BasePart") or desc:IsA("Decal") or desc:IsA("Clothing") or desc:IsA("ShirtGraphic") or desc:IsA("Accessory") or desc:IsA("MeshPart") then      
+                desc.Transparency = 1      
+            end      
+        end      
+    end      
 end)
