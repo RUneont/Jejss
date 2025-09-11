@@ -1,35 +1,29 @@
--- Fly Script with smooth movement + draggable GUI by @Ziggy
+-- Free-fly with smooth movement + draggable GUI by @Ziggy
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 
-local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local torso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
-local humanoid = character:FindFirstChildOfClass("Humanoid")
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
 
--- Fly variables
 local flying = false
 local speed = 50
-local bodyPos = Instance.new("BodyPosition")
-bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-bodyPos.D = 10
-
-local bodyGyro = Instance.new("BodyGyro")
-bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-bodyGyro.D = 10
+local velocity = Vector3.new()
 
 -- GUI
-local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 180, 0, 140)
 frame.Position = UDim2.new(0.8, 0, 0.2, 0)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,50)
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
+-- Developer watermark
 local watermark = Instance.new("TextLabel")
 watermark.Size = UDim2.new(1,0,0,20)
 watermark.Position = UDim2.new(0,0,0,0)
@@ -40,6 +34,7 @@ watermark.Font = Enum.Font.SourceSansBold
 watermark.TextScaled = true
 watermark.Parent = frame
 
+-- Arrow toggle
 local arrow = Instance.new("TextButton")
 arrow.Size = UDim2.new(0,30,0,30)
 arrow.Position = UDim2.new(1,-30,0,0)
@@ -50,8 +45,21 @@ arrow.TextScaled = true
 arrow.BackgroundColor3 = Color3.fromRGB(255,128,0)
 arrow.Parent = frame
 
+local isOpen = true
+arrow.MouseButton1Click:Connect(function()
+    isOpen = not isOpen
+    if isOpen then
+        frame.Size = UDim2.new(0,180,0,140)
+        arrow.Text = "▶"
+    else
+        frame.Size = UDim2.new(0,30,0,30)
+        arrow.Text = "◀"
+    end
+end)
+
+-- Fly toggle
 local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0, 160, 0, 40)
+flyButton.Size = UDim2.new(0,160,0,40)
 flyButton.Position = UDim2.new(0.5,-80,0,40)
 flyButton.Text = "Fly OFF"
 flyButton.Font = Enum.Font.SourceSansBold
@@ -60,49 +68,65 @@ flyButton.BackgroundColor3 = Color3.fromRGB(0,170,255)
 flyButton.TextScaled = true
 flyButton.Parent = frame
 
--- Dragging
-local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-frame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                   startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- Arrow toggle
-local isOpen = true
-arrow.MouseButton1Click:Connect(function()
-    isOpen = not isOpen
-    if isOpen then
-        frame.Size = UDim2.new(0, 180, 0, 140)
-        arrow.Text = "▶"
+flyButton.MouseButton1Click:Connect(function()
+    flying = not flying
+    if flying then
+        flyButton.Text = "Fly ON"
+        humanoid.PlatformStand = true
     else
-        frame.Size = UDim2.new(0, 30, 0, 30)
-        arrow.Text = "◀"
+        flyButton.Text = "Fly OFF"
+        humanoid.PlatformStand = false
     end
 end)
 
--- Fly toggle
+-- Proper draggable GUI
+do
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- Fly movement
+RunService.RenderStepped:Connect(function()
+    if flying then
+        local cam = workspace.CurrentCamera
+        local dir = Vector3.new()
+        if UIS:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
+
+        if dir.Magnitude > 0 then
+            hrp.CFrame += dir.Unit * speed * RunService.RenderStepped:Wait()
+        end
+    end
+end)-- Fly toggle
 flyButton.MouseButton1Click:Connect(function()
     flying = not flying
     if flying then
