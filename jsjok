@@ -1,4 +1,4 @@
--- @Ziggy Collapsible Fly+ESP+Sticky+Invisible Menu
+-- @Ziggy Collapsible Fly+ESP+Sticky+Invisible+RemoveRope Menu
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -17,11 +17,8 @@ local espColor = Color3.fromRGB(255,105,180)
 local highlights = {}
 local stickyTarget = nil
 local stickyActive = false
-local stickOffset = Vector3.new(0,0,1) -- closer gap
+local stickOffset = Vector3.new(0,0,1)
 local invisible = false
-
--- Store original transparency
-local originalStates = {}
 
 -- Prevent duplicate GUI
 if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then
@@ -55,7 +52,7 @@ title.Parent = frame
 
 local expanded = false
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1,0,0,200)
+content.Size = UDim2.new(1,0,0,240)
 content.Position = UDim2.new(0,0,0,30)
 content.BackgroundTransparency = 1
 content.Visible = false
@@ -65,7 +62,7 @@ title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         expanded = not expanded
         content.Visible = expanded
-        frame.Size = expanded and UDim2.new(0,160,0,230) or UDim2.new(0,160,0,30)
+        frame.Size = expanded and UDim2.new(0,160,0,270) or UDim2.new(0,160,0,30)
         title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
     end
 end)
@@ -133,34 +130,39 @@ createCheckbox("ESP", 28, function(val)
     espEnabled = val
 end)
 
--- Invisible Checkbox
+-- Invisible Checkbox (your sent version)
 createCheckbox("Invisible", 56, function(val)
     invisible = val
     if val then
-        -- Save original states
-        originalStates = {}
-        for _,desc in pairs(char:GetDescendants()) do
-            if (desc:IsA("BasePart") or desc:IsA("Decal") or desc:IsA("Clothing") or desc:IsA("ShirtGraphic") or desc:IsA("Accessory")) then
-                originalStates[desc] = desc.Transparency
-                desc.Transparency = 1
-                if desc:IsA("Accessory") and desc:FindFirstChild("Handle") then
-                    originalStates[desc.Handle] = desc.Handle.Transparency
-                    desc.Handle.Transparency = 1
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 1
+                if part.Name == "Head" and part:FindFirstChild("face") then
+                    part.face.Transparency = 1
                 end
+            elseif part:IsA("Decal") then
+                part.Transparency = 1
+            elseif part:IsA("Accessory") and part:FindFirstChild("Handle") then
+                part.Handle.Transparency = 1
             end
         end
     else
-        -- Restore original states
-        for obj,trans in pairs(originalStates) do
-            if obj and obj.Parent then
-                obj.Transparency = trans
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 0
+                if part.Name == "Head" and part:FindFirstChild("face") then
+                    part.face.Transparency = 0
+                end
+            elseif part:IsA("Decal") then
+                part.Transparency = 0
+            elseif part:IsA("Accessory") and part:FindFirstChild("Handle") then
+                part.Handle.Transparency = 0
             end
         end
-        originalStates = {}
     end
 end)
 
--- Player selector with arrows
+-- Player selector
 local playerList = {}
 local currentIndex = 1
 local function refreshPlayerList()
@@ -175,7 +177,6 @@ local function refreshPlayerList()
     end
 end
 refreshPlayerList()
-
 Players.PlayerAdded:Connect(refreshPlayerList)
 Players.PlayerRemoving:Connect(refreshPlayerList)
 
@@ -226,7 +227,6 @@ leftBtn.MouseButton1Click:Connect(function()
         updateTargetLabel()
     end
 end)
-
 rightBtn.MouseButton1Click:Connect(function()
     if #playerList > 0 then
         currentIndex = currentIndex + 1
@@ -269,10 +269,33 @@ unstickButton.MouseButton1Click:Connect(function()
     stickyActive = false
 end)
 
+-- Remove Rope Button
+local ropeButton = Instance.new("TextButton")
+ropeButton.Size = UDim2.new(1,-10,0,20)
+ropeButton.Position = UDim2.new(0,5,0,160)
+ropeButton.BackgroundColor3 = Color3.fromRGB(100,40,40)
+ropeButton.TextColor3 = Color3.fromRGB(255,255,255)
+ropeButton.Text = "Remove Rope"
+ropeButton.Font = Enum.Font.SourceSansBold
+ropeButton.TextScaled = true
+ropeButton.Parent = content
+
+ropeButton.MouseButton1Click:Connect(function()
+    local map = Workspace:FindFirstChild("Map")
+    if map and map:FindFirstChild("JumpRope") then
+        for _, dollName in ipairs({"Doll1","Doll2"}) do
+            local doll = map.JumpRope:FindFirstChild(dollName)
+            if doll and doll:FindFirstChild("DOLL123123") and doll.DOLL123123:FindFirstChild("ropeholder") then
+                doll.DOLL123123.ropeholder:ClearAllChildren()
+            end
+        end
+    end
+end)
+
 -- Watermark
 local watermark = Instance.new("TextLabel")
 watermark.Size = UDim2.new(1,0,0,15)
-watermark.Position = UDim2.new(0,0,0,165)
+watermark.Position = UDim2.new(0,0,0,185)
 watermark.BackgroundTransparency = 1
 watermark.Text = "@Ziggy"
 watermark.TextColor3 = Color3.fromRGB(255,255,255)
@@ -280,7 +303,7 @@ watermark.Font = Enum.Font.SourceSansItalic
 watermark.TextScaled = true
 watermark.Parent = content
 
--- Highlight helper
+-- ESP helper
 local function addHighlightToChar(ch)
     if not ch or not ch:IsA("Model") then return end
     if ch:FindFirstChild("ESP_Highlight") then return end
@@ -294,7 +317,6 @@ local function addHighlightToChar(ch)
     return hl
 end
 
--- ESP refresh
 local function refreshESP()
     for _,plr in pairs(Players:GetPlayers()) do
         if plr ~= player then
@@ -316,7 +338,6 @@ RunService.RenderStepped:Connect(refreshESP)
 
 -- Fly + Sticky
 RunService.RenderStepped:Connect(function()
-    -- Fly
     if flying and hrp and humanoid then
         local cam = Workspace.CurrentCamera
         local look = cam.CFrame.LookVector
@@ -335,7 +356,6 @@ RunService.RenderStepped:Connect(function()
         hrp.AssemblyLinearVelocity = desired * flySpeed
     end
 
-    -- Sticky
     if stickyActive and stickyTarget and stickyTarget.Character and stickyTarget.Character:FindFirstChild("HumanoidRootPart") and hrp then
         local targetHRP = stickyTarget.Character.HumanoidRootPart
         local backCFrame = targetHRP.CFrame * CFrame.new(0, 0, stickOffset.Z)
@@ -343,7 +363,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Cleanup
 Players.PlayerRemoving:Connect(function(plr)
     if highlights[plr] then
         if highlights[plr].Parent then highlights[plr]:Destroy() end
