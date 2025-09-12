@@ -1,4 +1,4 @@
--- @Ziggy Collapsible Fly+ESP+Sticky+Invisible Menu
+-- @Ziggy Collapsible Fly+ESP+Sticky+Invisible+Health Regen Menu
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -17,9 +17,9 @@ local espColor = Color3.fromRGB(255,105,180)
 local highlights = {}
 local stickyTarget = nil
 local stickyActive = false
-local stickOffset = Vector3.new(0,0,1.5) -- closer back stick
+local stickOffset = Vector3.new(0,0,2.2) -- closer to back
 local invisible = false
-local originalTransparency = {}
+local healthRegen = false
 
 -- Prevent duplicate GUI
 if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then
@@ -53,7 +53,7 @@ title.Parent = frame
 
 local expanded = false
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1,0,0,200)
+content.Size = UDim2.new(1,0,0,220)
 content.Position = UDim2.new(0,0,0,30)
 content.BackgroundTransparency = 1
 content.Visible = false
@@ -63,7 +63,7 @@ title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         expanded = not expanded
         content.Visible = expanded
-        frame.Size = expanded and UDim2.new(0,160,0,230) or UDim2.new(0,160,0,30)
+        frame.Size = expanded and UDim2.new(0,160,0,250) or UDim2.new(0,160,0,30)
         title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
     end
 end)
@@ -134,22 +134,19 @@ end)
 -- Invisible Checkbox
 createCheckbox("Invisible", 56, function(val)
     invisible = val
-    if val then
-        originalTransparency = {}
-        for _,desc in pairs(char:GetDescendants()) do
-            if desc:IsA("BasePart") or desc:IsA("Decal") or desc:IsA("Clothing") or desc:IsA("ShirtGraphic") or desc:IsA("Accessory") or desc:IsA("MeshPart") then
-                originalTransparency[desc] = desc.Transparency
-                desc.Transparency = 1
-            end
+    for _,desc in pairs(char:GetDescendants()) do
+        if desc:IsA("BasePart") or desc:IsA("Decal") or desc:IsA("MeshPart") or desc:IsA("Accessory") then
+            desc.Transparency = val and 1 or 0
         end
-    else
-        for desc,trans in pairs(originalTransparency) do
-            if desc and desc.Parent then
-                desc.Transparency = trans
-            end
+        if desc:IsA("Accessory") and desc:FindFirstChild("Handle") then
+            desc.Handle.Transparency = val and 1 or 0
         end
-        originalTransparency = {}
     end
+end)
+
+-- Health Regen Checkbox
+createCheckbox("Health Regen", 84, function(val)
+    healthRegen = val
 end)
 
 -- Player selector with arrows
@@ -167,6 +164,7 @@ local function refreshPlayerList()
     end
 end
 refreshPlayerList()
+
 Players.PlayerAdded:Connect(refreshPlayerList)
 Players.PlayerRemoving:Connect(refreshPlayerList)
 
@@ -263,7 +261,7 @@ end)
 -- Watermark
 local watermark = Instance.new("TextLabel")
 watermark.Size = UDim2.new(1,0,0,15)
-watermark.Position = UDim2.new(0,0,0,190)
+watermark.Position = UDim2.new(0,0,0,200)
 watermark.BackgroundTransparency = 1
 watermark.Text = "@Ziggy"
 watermark.TextColor3 = Color3.fromRGB(255,255,255)
@@ -305,7 +303,7 @@ local function refreshESP()
 end
 RunService.RenderStepped:Connect(refreshESP)
 
--- Fly + Sticky
+-- Fly + Sticky + Health Regen
 RunService.RenderStepped:Connect(function()
     -- Fly
     if flying and hrp and humanoid then
@@ -331,6 +329,11 @@ RunService.RenderStepped:Connect(function()
         local targetHRP = stickyTarget.Character.HumanoidRootPart
         local backCFrame = targetHRP.CFrame * CFrame.new(0, 0, stickOffset.Z)
         hrp.CFrame = CFrame.new(backCFrame.Position, targetHRP.Position)
+    end
+
+    -- Health Regen
+    if healthRegen and humanoid then
+        humanoid.Health = humanoid.MaxHealth
     end
 end)
 
