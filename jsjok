@@ -1,209 +1,377 @@
--- Collapsible Fly+ESP+Sticky+Invisibility+RemoveRope Menu
--- by Afshan
+-- @Ziggy Collapsible Fly+ESP+Sticky+Invisible+RemoveRope Menu  
+local Players = game:GetService("Players")  
+local RunService = game:GetService("RunService")  
+local UIS = game:GetService("UserInputService")  
+local Workspace = game:GetService("Workspace")  
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
+local player = Players.LocalPlayer  
+local char = player.Character or player.CharacterAdded:Wait()  
+local hrp = char:WaitForChild("HumanoidRootPart")  
+local humanoid = char:WaitForChild("Humanoid")  
 
-local player = Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local hrp = char:WaitForChild("HumanoidRootPart")
+-- Settings  
+local flying = false  
+local flySpeed = 50  
+local espEnabled = false  
+local espColor = Color3.fromRGB(255,105,180)  
+local highlights = {}  
+local stickyTarget = nil  
+local stickyActive = false  
+local stickOffset = Vector3.new(0,0,1)  
+local invisible = false  
+local originalProps = {}  
 
--- GUI
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 200, 0, 260)
-Frame.Position = UDim2.new(0, 20, 0.5, -130)
-Frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-Frame.Active = true
-Frame.Draggable = true
-Frame.Visible = true
-Frame.Name = "ModMenu"
+-- Prevent duplicate GUI  
+if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then  
+    player.PlayerGui.ZiggyMenu:Destroy()  
+end  
 
-local UIListLayout = Instance.new("UIListLayout", Frame)
-UIListLayout.Padding = UDim.new(0, 5)
+-- GUI  
+local gui = Instance.new("ScreenGui")  
+gui.Name = "ZiggyMenu"  
+gui.ResetOnSpawn = false  
+gui.Parent = player:WaitForChild("PlayerGui")  
 
-local function createToggle(name, callback)
-    local btn = Instance.new("TextButton", Frame)
-    btn.Size = UDim2.new(1, -10, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Text = name .. ": OFF"
-    local state = false
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        btn.Text = name .. ": " .. (state and "ON" or "OFF")
-        callback(state)
-    end)
-    return btn
-end
+local frame = Instance.new("Frame")  
+frame.Size = UDim2.new(0, 160, 0, 30)  
+frame.Position = UDim2.new(0.5, -80, 0.5, -15)  
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)  
+frame.BorderSizePixel = 0  
+frame.Active = true  
+frame.Draggable = true  
+frame.Parent = gui  
 
-----------------------------------------------------------------------
--- Fly
-----------------------------------------------------------------------
-local flying = false
-local flySpeed = 50
-local vel, gyro
+local title = Instance.new("TextLabel")  
+title.Size = UDim2.new(1,0,0,30)  
+title.Position = UDim2.new(0,0,0,0)  
+title.BackgroundTransparency = 1  
+title.Text = "Mod Menu ▼"  
+title.TextColor3 = Color3.fromRGB(255,255,255)  
+title.Font = Enum.Font.SourceSansBold  
+title.TextScaled = true  
+title.Parent = frame  
 
-local function setFly(on)
-    if on then
-        flying = true
-        vel = Instance.new("BodyVelocity", hrp)
-        vel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-        gyro = Instance.new("BodyGyro", hrp)
-        gyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        RunService.RenderStepped:Connect(function()
-            if flying then
-                vel.Velocity = Vector3.zero
-                local camCF = Workspace.CurrentCamera.CFrame
-                if UIS:IsKeyDown(Enum.KeyCode.W) then vel.Velocity = vel.Velocity + camCF.LookVector * flySpeed end
-                if UIS:IsKeyDown(Enum.KeyCode.S) then vel.Velocity = vel.Velocity - camCF.LookVector * flySpeed end
-                if UIS:IsKeyDown(Enum.KeyCode.A) then vel.Velocity = vel.Velocity - camCF.RightVector * flySpeed end
-                if UIS:IsKeyDown(Enum.KeyCode.D) then vel.Velocity = vel.Velocity + camCF.RightVector * flySpeed end
-                if UIS:IsKeyDown(Enum.KeyCode.Space) then vel.Velocity = vel.Velocity + Vector3.new(0, flySpeed, 0) end
-                if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then vel.Velocity = vel.Velocity - Vector3.new(0, flySpeed, 0) end
-                gyro.CFrame = camCF
-            end
-        end)
-    else
-        flying = false
-        if vel then vel:Destroy() end
-        if gyro then gyro:Destroy() end
-    end
-end
+local expanded = false  
+local content = Instance.new("Frame")  
+content.Size = UDim2.new(1,0,0,240)  
+content.Position = UDim2.new(0,0,0,30)  
+content.BackgroundTransparency = 1  
+content.Visible = false  
+content.Parent = frame  
 
-----------------------------------------------------------------------
--- ESP
-----------------------------------------------------------------------
-local espEnabled = false
-local espConnections = {}
+title.InputBegan:Connect(function(input)  
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
+        expanded = not expanded  
+        content.Visible = expanded  
+        frame.Size = expanded and UDim2.new(0,160,0,270) or UDim2.new(0,160,0,30)  
+        title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"  
+    end  
+end)  
 
-local function setESP(on)
-    espEnabled = on
-    for _,v in pairs(espConnections) do v:Disconnect() end
-    espConnections = {}
+-- Checkbox helper  
+local function createCheckbox(text, yPos, callback)  
+    local holder = Instance.new("Frame")  
+    holder.Size = UDim2.new(1,0,0,20)  
+    holder.Position = UDim2.new(0,0,0,yPos)  
+    holder.BackgroundTransparency = 1  
+    holder.Parent = content  
 
-    if on then
-        local function addESP(p)
-            if p == player then return end
-            local box = Instance.new("Highlight", p.Character or p.CharacterAdded:Wait())
-            box.FillTransparency = 1
-            box.OutlineColor = Color3.fromRGB(255,0,0)
-            local conn
-            conn = p.CharacterAdded:Connect(function(char)
-                box.Parent = char
-            end)
-            table.insert(espConnections, conn)
-        end
-        for _,p in pairs(Players:GetPlayers()) do addESP(p) end
-        table.insert(espConnections, Players.PlayerAdded:Connect(addESP))
-    else
-        for _,p in pairs(Players:GetPlayers()) do
-            if p.Character then
-                local h = p.Character:FindFirstChildOfClass("Highlight")
-                if h then h:Destroy() end
-            end
-        end
-    end
-end
+    local box = Instance.new("TextButton")  
+    box.Size = UDim2.new(0,18,0,18)  
+    box.Position = UDim2.new(0,6,0,1)  
+    box.BackgroundColor3 = Color3.fromRGB(60,60,60)  
+    box.BorderSizePixel = 0  
+    box.Text = ""  
+    box.AutoButtonColor = false  
+    box.Parent = holder  
 
-----------------------------------------------------------------------
--- Sticky
-----------------------------------------------------------------------
-local sticky = false
-local targetIndex = 1
-local offset = CFrame.new(0,0,3)
+    local check = Instance.new("TextLabel")  
+    check.Size = UDim2.new(1,0,1,0)  
+    check.BackgroundTransparency = 1  
+    check.Text = "✔"  
+    check.TextColor3 = Color3.fromRGB(0,220,0)  
+    check.Visible = false  
+    check.Font = Enum.Font.SourceSansBold  
+    check.TextScaled = true  
+    check.Parent = box  
 
-local function setSticky(on)
-    sticky = on
-    if on then
-        RunService.RenderStepped:Connect(function()
-            if sticky then
-                local plist = Players:GetPlayers()
-                if #plist > 1 then
-                    local t = plist[targetIndex]
-                    if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
-                        hrp.CFrame = t.Character.HumanoidRootPart.CFrame * offset
-                    end
-                end
-            end
-        end)
-    end
-end
+    local label = Instance.new("TextLabel")  
+    label.Size = UDim2.new(1,-30,1,0)  
+    label.Position = UDim2.new(0,30,0,0)  
+    label.BackgroundTransparency = 1  
+    label.TextColor3 = Color3.fromRGB(255,255,255)  
+    label.Text = text  
+    label.Font = Enum.Font.SourceSans  
+    label.TextScaled = true  
+    label.TextXAlignment = Enum.TextXAlignment.Left  
+    label.Parent = holder  
 
-----------------------------------------------------------------------
--- Invisibility (fixed restore system)
-----------------------------------------------------------------------
-local invisible = false
-local savedProps = {}
+    local state = false  
+    local function toggle()  
+        state = not state  
+        check.Visible = state  
+        callback(state)  
+    end  
+    box.MouseButton1Click:Connect(toggle)  
+    label.InputBegan:Connect(function(input)  
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
+            toggle()  
+        end  
+    end)  
+end  
 
-local function setInvisible(on)
-    local char = player.Character
-    if not char then return end
+-- Fly Checkbox  
+createCheckbox("Fly", 0, function(val)  
+    flying = val  
+    if not val and hrp then hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end  
+end)  
 
-    if on then
-        savedProps = {}
-        for _,desc in pairs(char:GetDescendants()) do
-            if desc:IsA("BasePart") then
-                savedProps[desc] = {Transparency = desc.Transparency, Color = desc.Color, Material = desc.Material}
-                desc.Transparency = 1
-                desc.CanCollide = false
-            elseif desc:IsA("Decal") then
-                savedProps[desc] = {Transparency = desc.Transparency}
-                desc.Transparency = 1
-            elseif desc:IsA("Clothing") or desc:IsA("ShirtGraphic") then
-                savedProps[desc] = {Parent = desc.Parent}
-                desc.Parent = nil
-            elseif desc:IsA("Accessory") and desc:FindFirstChild("Handle") then
-                local handle = desc.Handle
-                savedProps[handle] = {Transparency = handle.Transparency, Color = handle.Color, Material = handle.Material}
-                handle.Transparency = 1
-            end
-        end
-    else
-        for inst,props in pairs(savedProps) do
-            if inst.Parent or props.Parent then
-                for prop,val in pairs(props) do
-                    if prop == "Parent" then
-                        inst.Parent = val
-                    else
-                        pcall(function() inst[prop] = val end)
-                    end
-                end
-            end
-        end
-        savedProps = {}
-    end
-end
+-- ESP Checkbox  
+createCheckbox("ESP", 28, function(val)  
+    espEnabled = val  
+end)  
 
-----------------------------------------------------------------------
--- Remove Rope
-----------------------------------------------------------------------
-local function removeRope()
-    local map = Workspace:FindFirstChild("Map")
-    if not map then return end
-    local jr = map:FindFirstChild("JumpRope")
-    if not jr then return end
-    for _,dollName in pairs({"DOLL123123","Doll1","Doll2"}) do
-        local doll = jr:FindFirstChild(dollName)
-        if doll and doll:FindFirstChild("ropeholder") then
-            doll.ropeholder:ClearAllChildren()
-        end
-    end
-end
+-- Invisible Checkbox (fixed version with restore)  
+createCheckbox("Invisible", 56, function(val)  
+    invisible = val  
+    if val then  
+        originalProps = {}  
+        for _, part in ipairs(char:GetDescendants()) do  
+            if part:IsA("BasePart") then  
+                originalProps[part] = part.Transparency  
+                part.Transparency = 1  
+                if part.Name == "Head" and part:FindFirstChild("face") then  
+                    originalProps[part.face] = part.face.Transparency  
+                    part.face.Transparency = 1  
+                end  
+            elseif part:IsA("Decal") then  
+                originalProps[part] = part.Transparency  
+                part.Transparency = 1  
+            elseif part:IsA("Accessory") and part:FindFirstChild("Handle") then  
+                originalProps[part.Handle] = part.Handle.Transparency  
+                part.Handle.Transparency = 1  
+            end  
+        end  
+    else  
+        for inst, trans in pairs(originalProps) do  
+            if inst and inst.Parent then  
+                inst.Transparency = trans  
+            end  
+        end  
+        originalProps = {}  
+    end  
+end)  
 
-----------------------------------------------------------------------
--- Menu buttons
-----------------------------------------------------------------------
-createToggle("Fly", setFly)
-createToggle("ESP", setESP)
-createToggle("Sticky", setSticky)
-createToggle("Invisible", setInvisible)
+-- Player selector  
+local playerList = {}  
+local currentIndex = 1  
+local function refreshPlayerList()  
+    playerList = {}  
+    for _,plr in ipairs(Players:GetPlayers()) do  
+        if plr ~= player then table.insert(playerList, plr) end  
+    end  
+    if #playerList == 0 then  
+        currentIndex = 1  
+    elseif currentIndex > #playerList then  
+        currentIndex = 1  
+    end  
+end  
+refreshPlayerList()  
+Players.PlayerAdded:Connect(refreshPlayerList)  
+Players.PlayerRemoving:Connect(refreshPlayerList)  
 
-local ropeBtn = Instance.new("TextButton", Frame)
-ropeBtn.Size = UDim2.new(1, -10, 0, 30)
-ropeBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-ropeBtn.TextColor3 = Color3.new(1,1,1)
-ropeBtn.Text = "Remove Rope"
-ropeBtn.MouseButton1Click:Connect(removeRope)
+local selectorFrame = Instance.new("Frame")  
+selectorFrame.Size = UDim2.new(1,-10,0,20)  
+selectorFrame.Position = UDim2.new(0,5,0,85)  
+selectorFrame.BackgroundTransparency = 1  
+selectorFrame.Parent = content  
+
+local leftBtn = Instance.new("TextButton")  
+leftBtn.Size = UDim2.new(0,20,1,0)  
+leftBtn.Position = UDim2.new(0,0,0,0)  
+leftBtn.Text = "←"  
+leftBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)  
+leftBtn.TextColor3 = Color3.fromRGB(255,255,255)  
+leftBtn.Parent = selectorFrame  
+
+local rightBtn = Instance.new("TextButton")  
+rightBtn.Size = UDim2.new(0,20,1,0)  
+rightBtn.Position = UDim2.new(1,-20,0,0)  
+rightBtn.Text = "→"  
+rightBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)  
+rightBtn.TextColor3 = Color3.fromRGB(255,255,255)  
+rightBtn.Parent = selectorFrame  
+
+local targetLabel = Instance.new("TextLabel")  
+targetLabel.Size = UDim2.new(1,-40,1,0)  
+targetLabel.Position = UDim2.new(0,20,0,0)  
+targetLabel.BackgroundTransparency = 1  
+targetLabel.TextColor3 = Color3.fromRGB(255,255,255)  
+targetLabel.Font = Enum.Font.SourceSans  
+targetLabel.TextScaled = true  
+targetLabel.Parent = selectorFrame  
+
+local function updateTargetLabel()  
+    if #playerList > 0 then  
+        targetLabel.Text = "Target: "..playerList[currentIndex].Name  
+    else  
+        targetLabel.Text = "No players"  
+    end  
+end  
+updateTargetLabel()  
+
+leftBtn.MouseButton1Click:Connect(function()  
+    if #playerList > 0 then  
+        currentIndex = currentIndex - 1  
+        if currentIndex < 1 then currentIndex = #playerList end  
+        updateTargetLabel()  
+    end  
+end)  
+rightBtn.MouseButton1Click:Connect(function()  
+    if #playerList > 0 then  
+        currentIndex = currentIndex + 1  
+        if currentIndex > #playerList then currentIndex = 1 end  
+        updateTargetLabel()  
+    end  
+end)  
+
+-- Stick Button  
+local stickButton = Instance.new("TextButton")  
+stickButton.Size = UDim2.new(1,-10,0,20)  
+stickButton.Position = UDim2.new(0,5,0,110)  
+stickButton.BackgroundColor3 = Color3.fromRGB(40,40,40)  
+stickButton.TextColor3 = Color3.fromRGB(255,255,255)  
+stickButton.Text = "Stick to Back"  
+stickButton.Font = Enum.Font.SourceSansBold  
+stickButton.TextScaled = true  
+stickButton.Parent = content  
+
+stickButton.MouseButton1Click:Connect(function()  
+    if #playerList > 0 then  
+        stickyTarget = playerList[currentIndex]  
+        stickyActive = true  
+    end  
+end)  
+
+-- Unstick Button  
+local unstickButton = Instance.new("TextButton")  
+unstickButton.Size = UDim2.new(1,-10,0,20)  
+unstickButton.Position = UDim2.new(0,5,0,135)  
+unstickButton.BackgroundColor3 = Color3.fromRGB(40,40,40)  
+unstickButton.TextColor3 = Color3.fromRGB(255,255,255)  
+unstickButton.Text = "Unstick"  
+unstickButton.Font = Enum.Font.SourceSansBold  
+unstickButton.TextScaled = true  
+unstickButton.Parent = content  
+
+unstickButton.MouseButton1Click:Connect(function()  
+    stickyTarget = nil  
+    stickyActive = false  
+end)  
+
+-- Remove Rope Button  
+local ropeButton = Instance.new("TextButton")  
+ropeButton.Size = UDim2.new(1,-10,0,20)  
+ropeButton.Position = UDim2.new(0,5,0,160)  
+ropeButton.BackgroundColor3 = Color3.fromRGB(100,40,40)  
+ropeButton.TextColor3 = Color3.fromRGB(255,255,255)  
+ropeButton.Text = "Remove Rope"  
+ropeButton.Font = Enum.Font.SourceSansBold  
+ropeButton.TextScaled = true  
+ropeButton.Parent = content  
+
+ropeButton.MouseButton1Click:Connect(function()  
+    local map = Workspace:FindFirstChild("Map")  
+    if map and map:FindFirstChild("JumpRope") then  
+        for _, dollName in ipairs({"Doll1","Doll2"}) do  
+            local doll = map.JumpRope:FindFirstChild(dollName)  
+            if doll and doll:FindFirstChild("DOLL123123") and doll.DOLL123123:FindFirstChild("ropeholder") then  
+                doll.DOLL123123.ropeholder:ClearAllChildren()  
+            end  
+        end  
+    end  
+end)  
+
+-- Watermark  
+local watermark = Instance.new("TextLabel")  
+watermark.Size = UDim2.new(1,0,0,15)  
+watermark.Position = UDim2.new(0,0,0,185)  
+watermark.BackgroundTransparency = 1  
+watermark.Text = "@Ziggy"  
+watermark.TextColor3 = Color3.fromRGB(255,255,255)  
+watermark.Font = Enum.Font.SourceSansItalic  
+watermark.TextScaled = true  
+watermark.Parent = content  
+
+-- ESP helper  
+local function addHighlightToChar(ch)  
+    if not ch or not ch:IsA("Model") then return end  
+    if ch:FindFirstChild("ESP_Highlight") then return end  
+    local hl = Instance.new("Highlight")  
+    hl.Name = "ESP_Highlight"  
+    hl.Adornee = ch  
+    hl.Parent = ch  
+    hl.FillTransparency = 1  
+    hl.OutlineColor = espColor  
+    hl.OutlineTransparency = 0  
+    return hl  
+end  
+
+local function refreshESP()  
+    for _,plr in pairs(Players:GetPlayers()) do  
+        if plr ~= player then  
+            local ch = plr.Character  
+            if espEnabled then  
+                if ch and not highlights[plr] then  
+                    highlights[plr] = addHighlightToChar(ch)  
+                end  
+            else  
+                if highlights[plr] and highlights[plr].Parent then  
+                    highlights[plr]:Destroy()  
+                end  
+                highlights[plr] = nil  
+            end  
+        end  
+    end  
+end  
+RunService.RenderStepped:Connect(refreshESP)  
+
+-- Fly + Sticky  
+RunService.RenderStepped:Connect(function()  
+    if flying and hrp and humanoid then  
+        local cam = Workspace.CurrentCamera  
+        local look = cam.CFrame.LookVector  
+        local right = cam.CFrame.RightVector  
+        local horizLook = Vector3.new(look.X, 0, look.Z)  
+        local forwardAxis = (horizLook.Magnitude > 0.001) and horizLook.Unit or Vector3.new(0,0,-1)  
+        local rightAxis = Vector3.new(right.X, 0, right.Z)  
+        rightAxis = (rightAxis.Magnitude > 0.001) and rightAxis.Unit or Vector3.new(1,0,0)  
+        local moveDir = humanoid.MoveDirection  
+        local forwardInput = moveDir:Dot(forwardAxis)  
+        local rightInput = moveDir:Dot(rightAxis)  
+        local desired = cam.CFrame.LookVector * forwardInput + cam.CFrame.RightVector * rightInput  
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then  
+            desired = desired - Vector3.new(0,1,0)  
+        end  
+        hrp.AssemblyLinearVelocity = desired * flySpeed  
+    end  
+
+    if stickyActive and stickyTarget and stickyTarget.Character and stickyTarget.Character:FindFirstChild("HumanoidRootPart") and hrp then  
+        local targetHRP = stickyTarget.Character.HumanoidRootPart  
+        local backCFrame = targetHRP.CFrame * CFrame.new(0, 0, stickOffset.Z)  
+        hrp.CFrame = CFrame.new(backCFrame.Position, targetHRP.Position)  
+    end  
+end)  
+
+Players.PlayerRemoving:Connect(function(plr)  
+    if highlights[plr] then  
+        if highlights[plr].Parent then highlights[plr]:Destroy() end  
+        highlights[plr] = nil  
+    end  
+end)  
+
+player.CharacterAdded:Connect(function(c)  
+    char = c  
+    hrp = char:WaitForChild("HumanoidRootPart")  
+    humanoid = char:WaitForChild("Humanoid")  
+end)
