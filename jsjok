@@ -137,12 +137,37 @@ createCheckbox("Invisible", 56, function(val)
     invisible = val      
     originalTransparency = {}      
     for _,desc in pairs(char:GetDescendants()) do
-        if desc:IsA("BasePart") or desc:IsA("Decal") or desc:IsA("Clothing") or desc:IsA("ShirtGraphic") then
+        if desc:IsA("BasePart") or desc:IsA("Decal") or desc:IsA("MeshPart") or desc:IsA("Accessory") or desc:IsA("Clothing") or desc:IsA("ShirtGraphic") then
             originalTransparency[desc] = desc.Transparency
             desc.Transparency = val and 1 or originalTransparency[desc]
+            if desc:IsA("Accessory") and desc:FindFirstChild("Handle") then
+                desc.Handle.Transparency = val and 1 or originalTransparency[desc]
+            end
         end
     end
 end)      
+
+-- God Mode Checkbox right below Invisible
+createCheckbox("God Mode", 84, function(val)
+    godMode = val
+    if _G.GodModeConnection then _G.GodModeConnection:Disconnect() end
+    if _G.HealthChangedConnection then _G.HealthChangedConnection:Disconnect() end
+
+    _G.GodModeConnection = RunService.RenderStepped:Connect(function()
+        if godMode and humanoid and hrp then
+            humanoid.Health = humanoid.MaxHealth
+            hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0)
+        end
+    end)
+
+    _G.HealthChangedConnection = humanoid.HealthChanged:Connect(function(health)
+        if godMode then
+            if health < humanoid.MaxHealth then
+                humanoid.Health = humanoid.MaxHealth
+            end
+        end
+    end)
+end)
 
 -- Player selector with arrows      
 local playerList = {}      
@@ -326,28 +351,6 @@ RunService.RenderStepped:Connect(function()
         hrp.CFrame = CFrame.new(backCFrame.Position, targetHRP.Position)      
     end      
 end)      
-
--- God Mode Checkbox      
-createCheckbox("God Mode", 210, function(val)
-    godMode = val
-    if _G.GodModeConnection then _G.GodModeConnection:Disconnect() end
-    if _G.HealthChangedConnection then _G.HealthChangedConnection:Disconnect() end
-
-    _G.GodModeConnection = RunService.RenderStepped:Connect(function()
-        if godMode and humanoid and hrp then
-            humanoid.Health = humanoid.MaxHealth
-            hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0)
-        end
-    end)
-
-    _G.HealthChangedConnection = humanoid.HealthChanged:Connect(function(health)
-        if godMode then
-            if health < humanoid.MaxHealth then
-                humanoid.Health = humanoid.MaxHealth
-            end
-        end
-    end)
-end)
 
 -- Cleanup      
 Players.PlayerRemoving:Connect(function(plr)      
