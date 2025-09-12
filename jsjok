@@ -1,354 +1,506 @@
--- @Ziggy Collapsible Fly+ESP+Sticky+Invisible+RemoveRope Menu  
-local Players = game:GetService("Players")  
-local RunService = game:GetService("RunService")  
-local UIS = game:GetService("UserInputService")  
-local Workspace = game:GetService("Workspace")  
+-- @ZiggyModsV1
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
-local player = Players.LocalPlayer  
-local char = player.Character or player.CharacterAdded:Wait()  
-local hrp = char:WaitForChild("HumanoidRootPart")  
-local humanoid = char:WaitForChild("Humanoid")  
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
 
--- Settings  
-local flying = false  
-local flySpeed = 50  
-local espEnabled = false  
-local espColor = Color3.fromRGB(255,105,180)  
-local highlights = {}  
-local stickyTarget = nil  
-local stickyActive = false  
-local stickOffset = Vector3.new(0,0,1)  
-local invisible = false  
-local originalProps = {}  
+-- Settings
+local flying = false
+local flySpeed = 50
+local espEnabled = false
+local espColor = Color3.fromRGB(255,105,180)
+local highlights = {}            -- NOT used for actual highlight now, kept to avoid changing other logic names
+local espModified = {}          -- store original local transparency modifiers for ESP
+local stickyTarget = nil
+local stickyActive = false
+local stickOffset = Vector3.new(0,0,1)
+local invisible = false
+local originalProps = {}        -- map of instance -> table containing stored properties (for invisibility)
 
--- Prevent duplicate GUI  
-if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then  
-    player.PlayerGui.ZiggyMenu:Destroy()  
-end  
+-- Prevent duplicate GUI
+if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then
+    player.PlayerGui.ZiggyMenu:Destroy()
+end
 
--- GUI  
-local gui = Instance.new("ScreenGui")  
-gui.Name = "ZiggyMenu"  
-gui.ResetOnSpawn = false  
-gui.Parent = player:WaitForChild("PlayerGui")  
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "ZiggyMenu"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
-local frame = Instance.new("Frame")  
-frame.Size = UDim2.new(0, 160, 0, 30)  
-frame.Position = UDim2.new(0.5, -80, 0.5, -15)  
-frame.BackgroundColor3 = Color3.fromRGB(20,20,20)  
-frame.BorderSizePixel = 0  
-frame.Active = true  
-frame.Draggable = true  
-frame.Parent = gui  
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 160, 0, 30)
+frame.Position = UDim2.new(0.5, -80, 0.5, -15)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
 
-local title = Instance.new("TextLabel")  
-title.Size = UDim2.new(1,0,0,30)  
-title.Position = UDim2.new(0,0,0,0)  
-title.BackgroundTransparency = 1  
-title.Text = "Mod Menu ▼"  
-title.TextColor3 = Color3.fromRGB(255,255,255)  
-title.Font = Enum.Font.SourceSansBold  
-title.TextScaled = true  
-title.Parent = frame  
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,0)
+title.BackgroundTransparency = 1
+title.Text = "Mod Menu ▼"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Font = Enum.Font.SourceSansBold
+title.TextScaled = true
+title.Parent = frame
 
-local expanded = false  
-local content = Instance.new("Frame")  
-content.Size = UDim2.new(1,0,0,240)  
-content.Position = UDim2.new(0,0,0,30)  
-content.BackgroundTransparency = 1  
-content.Visible = false  
-content.Parent = frame  
+local expanded = false
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,0,0,240)
+content.Position = UDim2.new(0,0,0,30)
+content.BackgroundTransparency = 1
+content.Visible = false
+content.Parent = frame
 
-title.InputBegan:Connect(function(input)  
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
-        expanded = not expanded  
-        content.Visible = expanded  
-        frame.Size = expanded and UDim2.new(0,160,0,270) or UDim2.new(0,160,0,30)  
-        title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"  
-    end  
-end)  
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        expanded = not expanded
+        content.Visible = expanded
+        frame.Size = expanded and UDim2.new(0,160,0,270) or UDim2.new(0,160,0,30)
+        title.Text = expanded and "Mod Menu ▲" or "Mod Menu ▼"
+    end
+end)
 
--- Checkbox helper  
-local function createCheckbox(text, yPos, callback)  
-    local holder = Instance.new("Frame")  
-    holder.Size = UDim2.new(1,0,0,20)  
-    holder.Position = UDim2.new(0,0,0,yPos)  
-    holder.BackgroundTransparency = 1  
-    holder.Parent = content  
+-- Checkbox helper
+local function createCheckbox(text, yPos, callback)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1,0,0,20)
+    holder.Position = UDim2.new(0,0,0,yPos)
+    holder.BackgroundTransparency = 1
+    holder.Parent = content
 
-    local box = Instance.new("TextButton")  
-    box.Size = UDim2.new(0,18,0,18)  
-    box.Position = UDim2.new(0,6,0,1)  
-    box.BackgroundColor3 = Color3.fromRGB(60,60,60)  
-    box.BorderSizePixel = 0  
-    box.Text = ""  
-    box.AutoButtonColor = false  
-    box.Parent = holder  
+    local box = Instance.new("TextButton")
+    box.Size = UDim2.new(0,18,0,18)
+    box.Position = UDim2.new(0,6,0,1)
+    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    box.BorderSizePixel = 0
+    box.Text = ""
+    box.AutoButtonColor = false
+    box.Parent = holder
 
-    local check = Instance.new("TextLabel")  
-    check.Size = UDim2.new(1,0,1,0)  
-    check.BackgroundTransparency = 1  
-    check.Text = "✔"  
-    check.TextColor3 = Color3.fromRGB(0,220,0)  
-    check.Visible = false  
-    check.Font = Enum.Font.SourceSansBold  
-    check.TextScaled = true  
-    check.Parent = box  
+    local check = Instance.new("TextLabel")
+    check.Size = UDim2.new(1,0,1,0)
+    check.BackgroundTransparency = 1
+    check.Text = "✔"
+    check.TextColor3 = Color3.fromRGB(0,220,0)
+    check.Visible = false
+    check.Font = Enum.Font.SourceSansBold
+    check.TextScaled = true
+    check.Parent = box
 
-    local label = Instance.new("TextLabel")  
-    label.Size = UDim2.new(1,-30,1,0)  
-    label.Position = UDim2.new(0,30,0,0)  
-    label.BackgroundTransparency = 1  
-    label.TextColor3 = Color3.fromRGB(255,255,255)  
-    label.Text = text  
-    label.Font = Enum.Font.SourceSans  
-    label.TextScaled = true  
-    label.TextXAlignment = Enum.TextXAlignment.Left  
-    label.Parent = holder  
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,-30,1,0)
+    label.Position = UDim2.new(0,30,0,0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.Text = text
+    label.Font = Enum.Font.SourceSans
+    label.TextScaled = true
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = holder
 
-    local state = false  
-    local function toggle()  
-        state = not state  
-        check.Visible = state  
-        callback(state)  
-    end  
-    box.MouseButton1Click:Connect(toggle)  
-    label.InputBegan:Connect(function(input)  
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
-            toggle()  
-        end  
-    end)  
-end  
+    local state = false
+    local function toggle()
+        state = not state
+        check.Visible = state
+        callback(state)
+    end
+    box.MouseButton1Click:Connect(toggle)
+    label.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            toggle()
+        end
+    end)
+end
 
--- Fly Checkbox  
-createCheckbox("Fly", 0, function(val)  
-    flying = val  
-    if not val and hrp then hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end  
-end)  
+-- Fly Checkbox
+createCheckbox("Fly", 0, function(val)
+    flying = val
+    if not val and hrp then hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end
+end)
 
--- ESP Checkbox (full body color instead of highlight)  
-createCheckbox("ESP", 28, function(val)  
-    espEnabled = val  
-    for _,plr in pairs(Players:GetPlayers()) do  
-        if plr ~= player and plr.Character then  
-            for _,part in ipairs(plr.Character:GetDescendants()) do  
-                if part:IsA("BasePart") then  
-                    if val then  
-                        part.Color = espColor  
-                        part.Material = Enum.Material.Neon  
-                    else  
-                        part.Material = Enum.Material.Plastic  
-                    end  
-                end  
-            end  
-        end  
-    end  
-end)  
+-- ESP Checkbox
+createCheckbox("ESP", 28, function(val)
+    espEnabled = val
+    -- when toggled, immediately apply or restore ESP state for all players
+    if espEnabled then
+        -- enable: apply local transparency modifications to other players' parts
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= player and plr.Character then
+                local ch = plr.Character
+                for _, inst in ipairs(ch:GetDescendants()) do
+                    if inst:IsA("BasePart") then
+                        -- store original LocalTransparencyModifier (client-side property) so we can restore
+                        espModified[inst] = inst.LocalTransparencyModifier
+                        -- set to low transparency value so body appears (full-body opacity behavior)
+                        -- 0 means normal (opaque). We set to 0 to ensure parts are fully opaque locally.
+                        -- If you prefer semi-transparent, change the value below (0.2 = 20% more transparent).
+                        pcall(function() inst.LocalTransparencyModifier = 0 end)
+                    end
+                end
+            end
+        end
+    else
+        -- disable: restore stored LocalTransparencyModifier values
+        for inst, oldVal in pairs(espModified) do
+            if inst and inst.Parent then
+                pcall(function() inst.LocalTransparencyModifier = oldVal or 0 end)
+            end
+        end
+        espModified = {}
+    end
+end)
 
--- Invisible Checkbox (now restores face + hair correctly)  
-createCheckbox("Invisible", 56, function(val)  
-    invisible = val  
-    if val then  
-        originalProps = {}  
-        for _, part in ipairs(char:GetDescendants()) do  
-            if part:IsA("BasePart") then  
-                originalProps[part] = part.Transparency  
-                part.Transparency = 1  
-            elseif part:IsA("Decal") then  
-                originalProps[part] = part.Transparency  
-                part.Transparency = 1  
-            elseif part:IsA("Accessory") and part:FindFirstChild("Handle") then  
-                originalProps[part.Handle] = part.Handle.Transparency  
-                part.Handle.Transparency = 1  
-            end  
-        end  
-    else  
-        for inst, trans in pairs(originalProps) do  
-            if inst and inst.Parent then  
-                inst.Transparency = trans  
-            end  
-        end  
-        originalProps = {}  
-    end  
-end)  
+-- Invisible Checkbox (improved: uses LocalTransparencyModifier + stores/restore all relevant properties)
+createCheckbox("Invisible", 56, function(val)
+    invisible = val
+    if val then
+        originalProps = {}
+        -- store and set invisibility using LocalTransparencyModifier for BaseParts (client-only),
+        -- and set Decals/Textures/ParticleEmitters transparencies where applicable.
+        -- This approach attempts to cover Head face decal, accessories, hair meshes, etc.
+        if char then
+            for _, inst in ipairs(char:GetDescendants()) do
+                -- BASE PARTS (include Accessory Handles, MeshParts, Parts)
+                if inst:IsA("BasePart") then
+                    -- save both actual Transparency and LocalTransparencyModifier
+                    originalProps[inst] = originalProps[inst] or {}
+                    originalProps[inst].Transparency = inst.Transparency
+                    -- LocalTransparencyModifier might error on some legacy parts; pcall it
+                    local ok, prev = pcall(function() return inst.LocalTransparencyModifier end)
+                    if ok then
+                        originalProps[inst].LocalTransparencyModifier = prev
+                        pcall(function() inst.LocalTransparencyModifier = 1 end) -- make completely invisible locally
+                    else
+                        -- fallback: set Transparency to 1 and hope for restore later
+                        originalProps[inst].LocalTransparencyModifier = nil
+                        pcall(function() inst.Transparency = 1 end)
+                    end
+                end
 
--- Player selector  
-local playerList = {}  
-local currentIndex = 1  
-local function refreshPlayerList()  
-    playerList = {}  
-    for _,plr in ipairs(Players:GetPlayers()) do  
-        if plr ~= player then table.insert(playerList, plr) end  
-    end  
-    if #playerList == 0 then  
-        currentIndex = 1  
-    elseif currentIndex > #playerList then  
-        currentIndex = 1  
-    end  
-end  
-refreshPlayerList()  
-Players.PlayerAdded:Connect(refreshPlayerList)  
-Players.PlayerRemoving:Connect(refreshPlayerList)  
+                -- DECALS / TEXTURES
+                if inst:IsA("Decal") or inst:IsA("Texture") then
+                    originalProps[inst] = originalProps[inst] or {}
+                    originalProps[inst].Transparency = inst.Transparency
+                    pcall(function() inst.Transparency = 1 end)
+                end
 
-local selectorFrame = Instance.new("Frame")  
-selectorFrame.Size = UDim2.new(1,-10,0,20)  
-selectorFrame.Position = UDim2.new(0,5,0,85)  
-selectorFrame.BackgroundTransparency = 1  
-selectorFrame.Parent = content  
+                -- SPECIAL MESH / MESHES that have Offset/Scale/VertexTransparency (store mesh transparency where applicable)
+                if inst:IsA("SpecialMesh") or inst:IsA("Mesh") or inst:IsA("SkinnedMesh") then
+                    originalProps[inst] = originalProps[inst] or {}
+                    -- SpecialMesh doesn't have Transparency property; it relies on the parent part, so nothing to do most times
+                    -- But we still mark it so the restore loop can ignore it safely.
+                end
 
-local leftBtn = Instance.new("TextButton")  
-leftBtn.Size = UDim2.new(0,20,1,0)  
-leftBtn.Position = UDim2.new(0,0,0,0)  
-leftBtn.Text = "←"  
-leftBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)  
-leftBtn.TextColor3 = Color3.fromRGB(255,255,255)  
-leftBtn.Parent = selectorFrame  
+                -- PARTICLE EMITTERS / TRAILS
+                if inst:IsA("ParticleEmitter") or inst:IsA("Trail") then
+                    originalProps[inst] = originalProps[inst] or {}
+                    -- store Enabled state
+                    originalProps[inst].Enabled = inst.Enabled
+                    pcall(function() inst.Enabled = false end)
+                end
+            end
+        end
+    else
+        -- Restore everything we saved
+        for inst, props in pairs(originalProps) do
+            if inst and inst.Parent then
+                -- Restore BasePart transparencies and LocalTransparencyModifier (if stored)
+                if props.Transparency ~= nil and inst:IsA("BasePart") then
+                    pcall(function() inst.Transparency = props.Transparency end)
+                end
+                if props.LocalTransparencyModifier ~= nil and inst:IsA("BasePart") then
+                    pcall(function() inst.LocalTransparencyModifier = props.LocalTransparencyModifier end)
+                end
 
-local rightBtn = Instance.new("TextButton")  
-rightBtn.Size = UDim2.new(0,20,1,0)  
-rightBtn.Position = UDim2.new(1,-20,0,0)  
-rightBtn.Text = "→"  
-rightBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)  
-rightBtn.TextColor3 = Color3.fromRGB(255,255,255)  
-rightBtn.Parent = selectorFrame  
+                -- Restore Decal / Texture transparency
+                if props.Transparency ~= nil and (inst:IsA("Decal") or inst:IsA("Texture")) then
+                    pcall(function() inst.Transparency = props.Transparency end)
+                end
 
-local targetLabel = Instance.new("TextLabel")  
-targetLabel.Size = UDim2.new(1,-40,1,0)  
-targetLabel.Position = UDim2.new(0,20,0,0)  
-targetLabel.BackgroundTransparency = 1  
-targetLabel.TextColor3 = Color3.fromRGB(255,255,255)  
-targetLabel.Font = Enum.Font.SourceSans  
-targetLabel.TextScaled = true  
-targetLabel.Parent = selectorFrame  
+                -- Restore ParticleEmitters / Trails
+                if props.Enabled ~= nil and (inst:IsA("ParticleEmitter") or inst:IsA("Trail")) then
+                    pcall(function() inst.Enabled = props.Enabled end)
+                end
+            end
+        end
+        originalProps = {}
+    end
+end)
 
-local function updateTargetLabel()  
-    if #playerList > 0 then  
-        targetLabel.Text = "Target: "..playerList[currentIndex].Name  
-    else  
-        targetLabel.Text = "No players"  
-    end  
-end  
-updateTargetLabel()  
+-- Player selector
+local playerList = {}
+local currentIndex = 1
+local function refreshPlayerList()
+    playerList = {}
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then table.insert(playerList, plr) end
+    end
+    if #playerList == 0 then
+        currentIndex = 1
+    elseif currentIndex > #playerList then
+        currentIndex = 1
+    end
+end
+refreshPlayerList()
+Players.PlayerAdded:Connect(refreshPlayerList)
+Players.PlayerRemoving:Connect(refreshPlayerList)
 
-leftBtn.MouseButton1Click:Connect(function()  
-    if #playerList > 0 then  
-        currentIndex = currentIndex - 1  
-        if currentIndex < 1 then currentIndex = #playerList end  
-        updateTargetLabel()  
-    end  
-end)  
-rightBtn.MouseButton1Click:Connect(function()  
-    if #playerList > 0 then  
-        currentIndex = currentIndex + 1  
-        if currentIndex > #playerList then currentIndex = 1 end  
-        updateTargetLabel()  
-    end  
-end)  
+local selectorFrame = Instance.new("Frame")
+selectorFrame.Size = UDim2.new(1,-10,0,20)
+selectorFrame.Position = UDim2.new(0,5,0,85)
+selectorFrame.BackgroundTransparency = 1
+selectorFrame.Parent = content
 
--- Stick Button  
-local stickButton = Instance.new("TextButton")  
-stickButton.Size = UDim2.new(1,-10,0,20)  
-stickButton.Position = UDim2.new(0,5,0,110)  
-stickButton.BackgroundColor3 = Color3.fromRGB(40,40,40)  
-stickButton.TextColor3 = Color3.fromRGB(255,255,255)  
-stickButton.Text = "Stick to Back"  
-stickButton.Font = Enum.Font.SourceSansBold  
-stickButton.TextScaled = true  
-stickButton.Parent = content  
+local leftBtn = Instance.new("TextButton")
+leftBtn.Size = UDim2.new(0,20,1,0)
+leftBtn.Position = UDim2.new(0,0,0,0)
+leftBtn.Text = "←"
+leftBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+leftBtn.TextColor3 = Color3.fromRGB(255,255,255)
+leftBtn.Parent = selectorFrame
 
-stickButton.MouseButton1Click:Connect(function()  
-    if #playerList > 0 then  
-        stickyTarget = playerList[currentIndex]  
-        stickyActive = true  
-    end  
-end)  
+local rightBtn = Instance.new("TextButton")
+rightBtn.Size = UDim2.new(0,20,1,0)
+rightBtn.Position = UDim2.new(1,-20,0,0)
+rightBtn.Text = "→"
+rightBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+rightBtn.TextColor3 = Color3.fromRGB(255,255,255)
+rightBtn.Parent = selectorFrame
 
--- Unstick Button  
-local unstickButton = Instance.new("TextButton")  
-unstickButton.Size = UDim2.new(1,-10,0,20)  
-unstickButton.Position = UDim2.new(0,5,0,135)  
-unstickButton.BackgroundColor3 = Color3.fromRGB(40,40,40)  
-unstickButton.TextColor3 = Color3.fromRGB(255,255,255)  
-unstickButton.Text = "Unstick"  
-unstickButton.Font = Enum.Font.SourceSansBold  
-unstickButton.TextScaled = true  
-unstickButton.Parent = content  
+local targetLabel = Instance.new("TextLabel")
+targetLabel.Size = UDim2.new(1,-40,1,0)
+targetLabel.Position = UDim2.new(0,20,0,0)
+targetLabel.BackgroundTransparency = 1
+targetLabel.TextColor3 = Color3.fromRGB(255,255,255)
+targetLabel.Font = Enum.Font.SourceSans
+targetLabel.TextScaled = true
+targetLabel.Parent = selectorFrame
 
-unstickButton.MouseButton1Click:Connect(function()  
-    stickyTarget = nil  
-    stickyActive = false  
-end)  
+local function updateTargetLabel()
+    if #playerList > 0 then
+        targetLabel.Text = "Target: "..playerList[currentIndex].Name
+    else
+        targetLabel.Text = "No players"
+    end
+end
+updateTargetLabel()
 
--- Remove Rope Button  
-local ropeButton = Instance.new("TextButton")  
-ropeButton.Size = UDim2.new(1,-10,0,20)  
-ropeButton.Position = UDim2.new(0,5,0,160)  
-ropeButton.BackgroundColor3 = Color3.fromRGB(100,40,40)  
-ropeButton.TextColor3 = Color3.fromRGB(255,255,255)  
-ropeButton.Text = "Remove Rope"  
-ropeButton.Font = Enum.Font.SourceSansBold  
-ropeButton.TextScaled = true  
-ropeButton.Parent = content  
+leftBtn.MouseButton1Click:Connect(function()
+    if #playerList > 0 then
+        currentIndex = currentIndex - 1
+        if currentIndex < 1 then currentIndex = #playerList end
+        updateTargetLabel()
+    end
+end)
+rightBtn.MouseButton1Click:Connect(function()
+    if #playerList > 0 then
+        currentIndex = currentIndex + 1
+        if currentIndex > #playerList then currentIndex = 1 end
+        updateTargetLabel()
+    end
+end)
 
-ropeButton.MouseButton1Click:Connect(function()  
-    local map = Workspace:FindFirstChild("Map")  
-    if map and map:FindFirstChild("JumpRope") then  
-        for _, dollName in ipairs({"Doll1","Doll2"}) do  
-            local doll = map.JumpRope:FindFirstChild(dollName)  
-            if doll and doll:FindFirstChild("DOLL123123") and doll.DOLL123123:FindFirstChild("ropeholder") then  
-                doll.DOLL123123.ropeholder:ClearAllChildren()  
-            end  
-        end  
-    end  
-end)  
+-- Stick Button
+local stickButton = Instance.new("TextButton")
+stickButton.Size = UDim2.new(1,-10,0,20)
+stickButton.Position = UDim2.new(0,5,0,110)
+stickButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
+stickButton.TextColor3 = Color3.fromRGB(255,255,255)
+stickButton.Text = "Stick to Back"
+stickButton.Font = Enum.Font.SourceSansBold
+stickButton.TextScaled = true
+stickButton.Parent = content
 
--- Watermark  
-local watermark = Instance.new("TextLabel")  
-watermark.Size = UDim2.new(1,0,0,15)  
-watermark.Position = UDim2.new(0,0,0,185)  
-watermark.BackgroundTransparency = 1  
-watermark.Text = "@Ziggy"  
-watermark.TextColor3 = Color3.fromRGB(255,255,255)  
-watermark.Font = Enum.Font.SourceSansItalic  
-watermark.TextScaled = true  
-watermark.Parent = content  
+stickButton.MouseButton1Click:Connect(function()
+    if #playerList > 0 then
+        stickyTarget = playerList[currentIndex]
+        stickyActive = true
+    end
+end)
 
--- Fly + Sticky  
-RunService.RenderStepped:Connect(function()  
-    if flying and hrp and humanoid then  
-        local cam = Workspace.CurrentCamera  
-        local look = cam.CFrame.LookVector  
-        local right = cam.CFrame.RightVector  
-        local horizLook = Vector3.new(look.X, 0, look.Z)  
-        local forwardAxis = (horizLook.Magnitude > 0.001) and horizLook.Unit or Vector3.new(0,0,-1)  
-        local rightAxis = Vector3.new(right.X, 0, right.Z)  
-        rightAxis = (rightAxis.Magnitude > 0.001) and rightAxis.Unit or Vector3.new(1,0,0)  
-        local moveDir = humanoid.MoveDirection  
-        local forwardInput = moveDir:Dot(forwardAxis)  
-        local rightInput = moveDir:Dot(rightAxis)  
-        local desired = cam.CFrame.LookVector * forwardInput + cam.CFrame.RightVector * rightInput  
-        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then  
-            desired = desired - Vector3.new(0,1,0)  
-        end  
-        hrp.AssemblyLinearVelocity = desired * flySpeed  
-    end  
+-- Unstick Button
+local unstickButton = Instance.new("TextButton")
+unstickButton.Size = UDim2.new(1,-10,0,20)
+unstickButton.Position = UDim2.new(0,5,0,135)
+unstickButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
+unstickButton.TextColor3 = Color3.fromRGB(255,255,255)
+unstickButton.Text = "Unstick"
+unstickButton.Font = Enum.Font.SourceSansBold
+unstickButton.TextScaled = true
+unstickButton.Parent = content
 
-    if stickyActive and stickyTarget and stickyTarget.Character and stickyTarget.Character:FindFirstChild("HumanoidRootPart") and hrp then  
-        local targetHRP = stickyTarget.Character.HumanoidRootPart  
-        local backCFrame = targetHRP.CFrame * CFrame.new(0, 0, stickOffset.Z)  
-        hrp.CFrame = CFrame.new(backCFrame.Position, targetHRP.Position)  
-    end  
-end)  
+unstickButton.MouseButton1Click:Connect(function()
+    stickyTarget = nil
+    stickyActive = false
+end)
 
-Players.PlayerRemoving:Connect(function(plr)  
-    if highlights[plr] then  
-        if highlights[plr].Parent then highlights[plr]:Destroy() end  
-        highlights[plr] = nil  
-    end  
-end)  
+-- Remove Rope Button
+local ropeButton = Instance.new("TextButton")
+ropeButton.Size = UDim2.new(1,-10,0,20)
+ropeButton.Position = UDim2.new(0,5,0,160)
+ropeButton.BackgroundColor3 = Color3.fromRGB(100,40,40)
+ropeButton.TextColor3 = Color3.fromRGB(255,255,255)
+ropeButton.Text = "Remove Rope"
+ropeButton.Font = Enum.Font.SourceSansBold
+ropeButton.TextScaled = true
+ropeButton.Parent = content
 
-player.CharacterAdded:Connect(function(c)  
-    char = c  
-    hrp = char:WaitForChild("HumanoidRootPart")  
-    humanoid = char:WaitForChild("Humanoid")  
+ropeButton.MouseButton1Click:Connect(function()
+    local map = Workspace:FindFirstChild("Map")
+    if map and map:FindFirstChild("JumpRope") then
+        for _, dollName in ipairs({"Doll1","Doll2"}) do
+            local doll = map.JumpRope:FindFirstChild(dollName)
+            if doll and doll:FindFirstChild("DOLL123123") and doll.DOLL123123:FindFirstChild("ropeholder") then
+                doll.DOLL123123.ropeholder:ClearAllChildren()
+            end
+        end
+    end
+end)
+
+-- Watermark
+local watermark = Instance.new("TextLabel")
+watermark.Size = UDim2.new(1,0,0,15)
+watermark.Position = UDim2.new(0,0,0,185)
+watermark.BackgroundTransparency = 1
+watermark.Text = "@Ziggy"
+watermark.TextColor3 = Color3.fromRGB(255,255,255)
+watermark.Font = Enum.Font.SourceSansItalic
+watermark.TextScaled = true
+watermark.Parent = content
+
+-- ESP helper (replaces highlight behavior with local-transparency-based full-body opacity treatment)
+local function enableESPForCharacter(ch)
+    if not ch then return end
+    for _, inst in ipairs(ch:GetDescendants()) do
+        if inst:IsA("BasePart") then
+            -- store previous value if not stored
+            if not espModified[inst] then
+                local ok, prev = pcall(function() return inst.LocalTransparencyModifier end)
+                if ok then espModified[inst] = prev else espModified[inst] = nil end
+            end
+            -- make fully visible locally (0) -> full-body opacity
+            pcall(function() inst.LocalTransparencyModifier = 0 end)
+        end
+        -- optionally tint color for certain parts? Avoid changing color to keep "exact same" appearance
+    end
+end
+
+local function disableESPForCharacter(ch)
+    if not ch then return end
+    for _, inst in ipairs(ch:GetDescendants()) do
+        if inst:IsA("BasePart") then
+            local old = espModified[inst]
+            if old ~= nil then
+                pcall(function() inst.LocalTransparencyModifier = old end)
+                espModified[inst] = nil
+            else
+                -- if we didn't store it, attempt to set to default 0
+                pcall(function() inst.LocalTransparencyModifier = 0 end)
+            end
+        end
+    end
+end
+
+-- Periodically refresh to cover newly spawned characters/accessories
+RunService.Heartbeat:Connect(function()
+    -- Update player list (so selector remains in sync)
+    refreshPlayerList()
+    updateTargetLabel()
+
+    -- Refresh ESP for all players
+    if espEnabled then
+        for _,plr in pairs(Players:GetPlayers()) do
+            if plr ~= player then
+                local ch = plr.Character
+                if ch then
+                    enableESPForCharacter(ch)
+                end
+            end
+        end
+    end
+end)
+
+-- Fly + Sticky
+RunService.RenderStepped:Connect(function()
+    if flying and hrp and humanoid then
+        local cam = Workspace.CurrentCamera
+        local look = cam.CFrame.LookVector
+        local right = cam.CFrame.RightVector
+        local horizLook = Vector3.new(look.X, 0, look.Z)
+        local forwardAxis = (horizLook.Magnitude > 0.001) and horizLook.Unit or Vector3.new(0,0,-1)
+        local rightAxis = Vector3.new(right.X, 0, right.Z)
+        rightAxis = (rightAxis.Magnitude > 0.001) and rightAxis.Unit or Vector3.new(1,0,0)
+        local moveDir = humanoid.MoveDirection
+        local forwardInput = moveDir:Dot(forwardAxis)
+        local rightInput = moveDir:Dot(rightAxis)
+        local desired = cam.CFrame.LookVector * forwardInput + cam.CFrame.RightVector * rightInput
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+            desired = desired - Vector3.new(0,1,0)
+        end
+        hrp.AssemblyLinearVelocity = desired * flySpeed
+    end
+
+    if stickyActive and stickyTarget and stickyTarget.Character and stickyTarget.Character:FindFirstChild("HumanoidRootPart") and hrp then
+        local targetHRP = stickyTarget.Character.HumanoidRootPart
+        local backCFrame = targetHRP.CFrame * CFrame.new(0, 0, stickOffset.Z)
+        hrp.CFrame = CFrame.new(backCFrame.Position, targetHRP.Position)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    -- cleanup any espModified entries for that player's character parts
+    if plr and plr.Character then
+        disableESPForCharacter(plr.Character)
+    end
+end)
+
+player.CharacterAdded:Connect(function(c)
+    char = c
+    hrp = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
+
+    -- If invisibility is active when character respawns, reapply invisibility immediately
+    if invisible then
+        -- small delay so character parts exist
+        wait(0.1)
+        for _, inst in ipairs(char:GetDescendants()) do
+            if inst:IsA("BasePart") then
+                -- store previous and set modifier
+                originalProps[inst] = originalProps[inst] or {}
+                originalProps[inst].Transparency = inst.Transparency
+                local ok, prev = pcall(function() return inst.LocalTransparencyModifier end)
+                if ok then
+                    originalProps[inst].LocalTransparencyModifier = prev
+                    pcall(function() inst.LocalTransparencyModifier = 1 end)
+                else
+                    originalProps[inst].LocalTransparencyModifier = nil
+                    pcall(function() inst.Transparency = 1 end)
+                end
+            end
+            if inst:IsA("Decal") or inst:IsA("Texture") then
+                originalProps[inst] = originalProps[inst] or {}
+                originalProps[inst].Transparency = inst.Transparency
+                pcall(function() inst.Transparency = 1 end)
+            end
+            if inst:IsA("ParticleEmitter") or inst:IsA("Trail") then
+                originalProps[inst] = originalProps[inst] or {}
+                originalProps[inst].Enabled = inst.Enabled
+                pcall(function() inst.Enabled = false end)
+            end
+        end
+    end
+
+    -- If ESP is enabled, ensure ESP applies to new characters
+    if espEnabled then
+        enableESPForCharacter(char)
+    end
 end)
