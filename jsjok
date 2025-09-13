@@ -1,4 +1,8 @@
--- @ZiggyModsV1
+-- @Ziggy Collapsible Fly+ESP+Sticky+Invisible+RemoveRope Menu (final with fixes)
+-- Invisible now hides name/health bars + accessories
+-- ESP now neon-pink full-body highlight (no Highlight instance)
+-- Fonts styled GothamBold, tick box white with black check
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -14,13 +18,13 @@ local flying = false
 local flySpeed = 50
 local espEnabled = false
 local espColor = Color3.fromRGB(255,105,180)
-local highlights = {}            -- NOT used for actual highlight now, kept to avoid changing other logic names
-local espModified = {}          -- store original local transparency modifiers for ESP
+local highlights = {}
+local espModified = {}
 local stickyTarget = nil
 local stickyActive = false
 local stickOffset = Vector3.new(0,0,1)
 local invisible = false
-local originalProps = {}        -- map of instance -> table containing stored properties (for invisibility)
+local originalProps = {}
 
 -- Prevent duplicate GUI
 if player:FindFirstChild("PlayerGui"):FindFirstChild("ZiggyMenu") then
@@ -48,7 +52,7 @@ title.Position = UDim2.new(0,0,0,0)
 title.BackgroundTransparency = 1
 title.Text = "Mod Menu ▼"
 title.TextColor3 = Color3.fromRGB(255,255,255)
-title.Font = Enum.Font.SourceSansBold
+title.Font = Enum.Font.GothamBold
 title.TextScaled = true
 title.Parent = frame
 
@@ -80,7 +84,7 @@ local function createCheckbox(text, yPos, callback)
     local box = Instance.new("TextButton")
     box.Size = UDim2.new(0,18,0,18)
     box.Position = UDim2.new(0,6,0,1)
-    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    box.BackgroundColor3 = Color3.fromRGB(255,255,255) -- white box
     box.BorderSizePixel = 0
     box.Text = ""
     box.AutoButtonColor = false
@@ -90,9 +94,9 @@ local function createCheckbox(text, yPos, callback)
     check.Size = UDim2.new(1,0,1,0)
     check.BackgroundTransparency = 1
     check.Text = "✔"
-    check.TextColor3 = Color3.fromRGB(0,220,0)
+    check.TextColor3 = Color3.fromRGB(0,0,0) -- black tick
     check.Visible = false
-    check.Font = Enum.Font.SourceSansBold
+    check.Font = Enum.Font.GothamBold
     check.TextScaled = true
     check.Parent = box
 
@@ -102,7 +106,7 @@ local function createCheckbox(text, yPos, callback)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(255,255,255)
     label.Text = text
-    label.Font = Enum.Font.SourceSans
+    label.Font = Enum.Font.GothamBold
     label.TextScaled = true
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = holder
@@ -127,109 +131,56 @@ createCheckbox("Fly", 0, function(val)
     if not val and hrp then hrp.AssemblyLinearVelocity = Vector3.new(0,0,0) end
 end)
 
--- ESP Checkbox
+-- ESP Checkbox (fixed)
 createCheckbox("ESP", 28, function(val)
     espEnabled = val
-    -- when toggled, immediately apply or restore ESP state for all players
-    if espEnabled then
-        -- enable: apply local transparency modifications to other players' parts
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= player and plr.Character then
-                local ch = plr.Character
-                for _, inst in ipairs(ch:GetDescendants()) do
-                    if inst:IsA("BasePart") then
-                        -- store original LocalTransparencyModifier (client-side property) so we can restore
-                        espModified[inst] = inst.LocalTransparencyModifier
-                        -- set to low transparency value so body appears (full-body opacity behavior)
-                        -- 0 means normal (opaque). We set to 0 to ensure parts are fully opaque locally.
-                        -- If you prefer semi-transparent, change the value below (0.2 = 20% more transparent).
-                        pcall(function() inst.LocalTransparencyModifier = 0 end)
-                    end
-                end
-            end
-        end
-    else
-        -- disable: restore stored LocalTransparencyModifier values
-        for inst, oldVal in pairs(espModified) do
+    if not espEnabled then
+        for inst, props in pairs(espModified) do
             if inst and inst.Parent then
-                pcall(function() inst.LocalTransparencyModifier = oldVal or 0 end)
+                pcall(function() inst.LocalTransparencyModifier = props.LocalTransparencyModifier or 0 end)
+                pcall(function() inst.Color = props.Color end)
+                pcall(function() inst.Material = props.Material end)
             end
         end
         espModified = {}
     end
 end)
 
--- Invisible Checkbox (improved: uses LocalTransparencyModifier + stores/restore all relevant properties)
+-- Invisible Checkbox (now hides name/health too)
 createCheckbox("Invisible", 56, function(val)
     invisible = val
     if val then
         originalProps = {}
-        -- store and set invisibility using LocalTransparencyModifier for BaseParts (client-only),
-        -- and set Decals/Textures/ParticleEmitters transparencies where applicable.
-        -- This approach attempts to cover Head face decal, accessories, hair meshes, etc.
         if char then
             for _, inst in ipairs(char:GetDescendants()) do
-                -- BASE PARTS (include Accessory Handles, MeshParts, Parts)
                 if inst:IsA("BasePart") then
-                    -- save both actual Transparency and LocalTransparencyModifier
-                    originalProps[inst] = originalProps[inst] or {}
-                    originalProps[inst].Transparency = inst.Transparency
-                    -- LocalTransparencyModifier might error on some legacy parts; pcall it
-                    local ok, prev = pcall(function() return inst.LocalTransparencyModifier end)
-                    if ok then
-                        originalProps[inst].LocalTransparencyModifier = prev
-                        pcall(function() inst.LocalTransparencyModifier = 1 end) -- make completely invisible locally
-                    else
-                        -- fallback: set Transparency to 1 and hope for restore later
-                        originalProps[inst].LocalTransparencyModifier = nil
-                        pcall(function() inst.Transparency = 1 end)
-                    end
+                    originalProps[inst] = {
+                        Transparency = inst.Transparency,
+                        LocalTransparencyModifier = inst.LocalTransparencyModifier
+                    }
+                    pcall(function() inst.LocalTransparencyModifier = 1 end)
                 end
-
-                -- DECALS / TEXTURES
                 if inst:IsA("Decal") or inst:IsA("Texture") then
-                    originalProps[inst] = originalProps[inst] or {}
-                    originalProps[inst].Transparency = inst.Transparency
-                    pcall(function() inst.Transparency = 1 end)
+                    originalProps[inst] = {Transparency = inst.Transparency}
+                    inst.Transparency = 1
                 end
-
-                -- SPECIAL MESH / MESHES that have Offset/Scale/VertexTransparency (store mesh transparency where applicable)
-                if inst:IsA("SpecialMesh") or inst:IsA("Mesh") or inst:IsA("SkinnedMesh") then
-                    originalProps[inst] = originalProps[inst] or {}
-                    -- SpecialMesh doesn't have Transparency property; it relies on the parent part, so nothing to do most times
-                    -- But we still mark it so the restore loop can ignore it safely.
-                end
-
-                -- PARTICLE EMITTERS / TRAILS
                 if inst:IsA("ParticleEmitter") or inst:IsA("Trail") then
-                    originalProps[inst] = originalProps[inst] or {}
-                    -- store Enabled state
-                    originalProps[inst].Enabled = inst.Enabled
-                    pcall(function() inst.Enabled = false end)
+                    originalProps[inst] = {Enabled = inst.Enabled}
+                    inst.Enabled = false
                 end
+            end
+            if humanoid then
+                originalProps[humanoid] = {DisplayDistanceType = humanoid.DisplayDistanceType}
+                humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
             end
         end
     else
-        -- Restore everything we saved
         for inst, props in pairs(originalProps) do
             if inst and inst.Parent then
-                -- Restore BasePart transparencies and LocalTransparencyModifier (if stored)
-                if props.Transparency ~= nil and inst:IsA("BasePart") then
-                    pcall(function() inst.Transparency = props.Transparency end)
-                end
-                if props.LocalTransparencyModifier ~= nil and inst:IsA("BasePart") then
-                    pcall(function() inst.LocalTransparencyModifier = props.LocalTransparencyModifier end)
-                end
-
-                -- Restore Decal / Texture transparency
-                if props.Transparency ~= nil and (inst:IsA("Decal") or inst:IsA("Texture")) then
-                    pcall(function() inst.Transparency = props.Transparency end)
-                end
-
-                -- Restore ParticleEmitters / Trails
-                if props.Enabled ~= nil and (inst:IsA("ParticleEmitter") or inst:IsA("Trail")) then
-                    pcall(function() inst.Enabled = props.Enabled end)
-                end
+                if props.Transparency ~= nil then pcall(function() inst.Transparency = props.Transparency end) end
+                if props.LocalTransparencyModifier ~= nil then pcall(function() inst.LocalTransparencyModifier = props.LocalTransparencyModifier end) end
+                if props.Enabled ~= nil then pcall(function() inst.Enabled = props.Enabled end) end
+                if props.DisplayDistanceType ~= nil then pcall(function() inst.DisplayDistanceType = props.DisplayDistanceType end) end
             end
         end
         originalProps = {}
@@ -266,6 +217,7 @@ leftBtn.Position = UDim2.new(0,0,0,0)
 leftBtn.Text = "←"
 leftBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 leftBtn.TextColor3 = Color3.fromRGB(255,255,255)
+leftBtn.Font = Enum.Font.GothamBold
 leftBtn.Parent = selectorFrame
 
 local rightBtn = Instance.new("TextButton")
@@ -274,6 +226,7 @@ rightBtn.Position = UDim2.new(1,-20,0,0)
 rightBtn.Text = "→"
 rightBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 rightBtn.TextColor3 = Color3.fromRGB(255,255,255)
+rightBtn.Font = Enum.Font.GothamBold
 rightBtn.Parent = selectorFrame
 
 local targetLabel = Instance.new("TextLabel")
@@ -281,7 +234,7 @@ targetLabel.Size = UDim2.new(1,-40,1,0)
 targetLabel.Position = UDim2.new(0,20,0,0)
 targetLabel.BackgroundTransparency = 1
 targetLabel.TextColor3 = Color3.fromRGB(255,255,255)
-targetLabel.Font = Enum.Font.SourceSans
+targetLabel.Font = Enum.Font.GothamBold
 targetLabel.TextScaled = true
 targetLabel.Parent = selectorFrame
 
@@ -316,7 +269,7 @@ stickButton.Position = UDim2.new(0,5,0,110)
 stickButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
 stickButton.TextColor3 = Color3.fromRGB(255,255,255)
 stickButton.Text = "Stick to Back"
-stickButton.Font = Enum.Font.SourceSansBold
+stickButton.Font = Enum.Font.GothamBold
 stickButton.TextScaled = true
 stickButton.Parent = content
 
@@ -334,7 +287,7 @@ unstickButton.Position = UDim2.new(0,5,0,135)
 unstickButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
 unstickButton.TextColor3 = Color3.fromRGB(255,255,255)
 unstickButton.Text = "Unstick"
-unstickButton.Font = Enum.Font.SourceSansBold
+unstickButton.Font = Enum.Font.GothamBold
 unstickButton.TextScaled = true
 unstickButton.Parent = content
 
@@ -350,7 +303,7 @@ ropeButton.Position = UDim2.new(0,5,0,160)
 ropeButton.BackgroundColor3 = Color3.fromRGB(100,40,40)
 ropeButton.TextColor3 = Color3.fromRGB(255,255,255)
 ropeButton.Text = "Remove Rope"
-ropeButton.Font = Enum.Font.SourceSansBold
+ropeButton.Font = Enum.Font.GothamBold
 ropeButton.TextScaled = true
 ropeButton.Parent = content
 
@@ -373,57 +326,51 @@ watermark.Position = UDim2.new(0,0,0,185)
 watermark.BackgroundTransparency = 1
 watermark.Text = "@Ziggy"
 watermark.TextColor3 = Color3.fromRGB(255,255,255)
-watermark.Font = Enum.Font.SourceSansItalic
+watermark.Font = Enum.Font.GothamBold
 watermark.TextScaled = true
 watermark.Parent = content
 
--- ESP helper (replaces highlight behavior with local-transparency-based full-body opacity treatment)
+-- ESP helper
 local function enableESPForCharacter(ch)
     if not ch then return end
     for _, inst in ipairs(ch:GetDescendants()) do
         if inst:IsA("BasePart") then
-            -- store previous value if not stored
             if not espModified[inst] then
-                local ok, prev = pcall(function() return inst.LocalTransparencyModifier end)
-                if ok then espModified[inst] = prev else espModified[inst] = nil end
+                espModified[inst] = {
+                    LocalTransparencyModifier = inst.LocalTransparencyModifier,
+                    Color = inst.Color,
+                    Material = inst.Material
+                }
             end
-            -- make fully visible locally (0) -> full-body opacity
             pcall(function() inst.LocalTransparencyModifier = 0 end)
+            pcall(function() inst.Color = espColor end)
+            pcall(function() inst.Material = Enum.Material.Neon end)
         end
-        -- optionally tint color for certain parts? Avoid changing color to keep "exact same" appearance
     end
 end
 
 local function disableESPForCharacter(ch)
     if not ch then return end
     for _, inst in ipairs(ch:GetDescendants()) do
-        if inst:IsA("BasePart") then
-            local old = espModified[inst]
-            if old ~= nil then
-                pcall(function() inst.LocalTransparencyModifier = old end)
-                espModified[inst] = nil
-            else
-                -- if we didn't store it, attempt to set to default 0
-                pcall(function() inst.LocalTransparencyModifier = 0 end)
-            end
+        local props = espModified[inst]
+        if props then
+            pcall(function() inst.LocalTransparencyModifier = props.LocalTransparencyModifier or 0 end)
+            pcall(function() inst.Color = props.Color end)
+            pcall(function() inst.Material = props.Material end)
+            espModified[inst] = nil
         end
     end
 end
 
--- Periodically refresh to cover newly spawned characters/accessories
+-- Refresh loop
 RunService.Heartbeat:Connect(function()
-    -- Update player list (so selector remains in sync)
     refreshPlayerList()
     updateTargetLabel()
-
-    -- Refresh ESP for all players
     if espEnabled then
         for _,plr in pairs(Players:GetPlayers()) do
             if plr ~= player then
                 local ch = plr.Character
-                if ch then
-                    enableESPForCharacter(ch)
-                end
+                if ch then enableESPForCharacter(ch) end
             end
         end
     end
@@ -448,7 +395,6 @@ RunService.RenderStepped:Connect(function()
         end
         hrp.AssemblyLinearVelocity = desired * flySpeed
     end
-
     if stickyActive and stickyTarget and stickyTarget.Character and stickyTarget.Character:FindFirstChild("HumanoidRootPart") and hrp then
         local targetHRP = stickyTarget.Character.HumanoidRootPart
         local backCFrame = targetHRP.CFrame * CFrame.new(0, 0, stickOffset.Z)
@@ -457,7 +403,6 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Players.PlayerRemoving:Connect(function(plr)
-    -- cleanup any espModified entries for that player's character parts
     if plr and plr.Character then
         disableESPForCharacter(plr.Character)
     end
@@ -468,39 +413,30 @@ player.CharacterAdded:Connect(function(c)
     hrp = char:WaitForChild("HumanoidRootPart")
     humanoid = char:WaitForChild("Humanoid")
 
-    -- If invisibility is active when character respawns, reapply invisibility immediately
     if invisible then
-        -- small delay so character parts exist
         wait(0.1)
         for _, inst in ipairs(char:GetDescendants()) do
             if inst:IsA("BasePart") then
-                -- store previous and set modifier
-                originalProps[inst] = originalProps[inst] or {}
-                originalProps[inst].Transparency = inst.Transparency
-                local ok, prev = pcall(function() return inst.LocalTransparencyModifier end)
-                if ok then
-                    originalProps[inst].LocalTransparencyModifier = prev
-                    pcall(function() inst.LocalTransparencyModifier = 1 end)
-                else
-                    originalProps[inst].LocalTransparencyModifier = nil
-                    pcall(function() inst.Transparency = 1 end)
-                end
+                originalProps[inst] = {
+                    Transparency = inst.Transparency,
+                    LocalTransparencyModifier = inst.LocalTransparencyModifier
+                }
+                pcall(function() inst.LocalTransparencyModifier = 1 end)
             end
             if inst:IsA("Decal") or inst:IsA("Texture") then
-                originalProps[inst] = originalProps[inst] or {}
-                originalProps[inst].Transparency = inst.Transparency
-                pcall(function() inst.Transparency = 1 end)
+                originalProps[inst] = {Transparency = inst.Transparency}
+                inst.Transparency = 1
             end
             if inst:IsA("ParticleEmitter") or inst:IsA("Trail") then
-                originalProps[inst] = originalProps[inst] or {}
-                originalProps[inst].Enabled = inst.Enabled
-                pcall(function() inst.Enabled = false end)
+                originalProps[inst] = {Enabled = inst.Enabled}
+                inst.Enabled = false
             end
+        end
+        if humanoid then
+            originalProps[humanoid] = {DisplayDistanceType = humanoid.DisplayDistanceType}
+            humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
         end
     end
 
-    -- If ESP is enabled, ensure ESP applies to new characters
-    if espEnabled then
-        enableESPForCharacter(char)
-    end
+    if espEnabled then enableESPForCharacter(char) end
 end)
