@@ -1,7 +1,8 @@
--- @Ziggy Collapsible Fly+ESP+Sticky+Invisible+RemoveRope Menu (final with fixes)
--- Invisible now hides name/health bars + accessories
--- ESP now neon-pink full-body highlight (no Highlight instance)
+-- @Ziggy Collapsible Fly+ESP+Sticky+Invisible+RemoveRope Menu (final with server-visible invis + instant stick)
+-- Invisible now sets both Transparency + LocalTransparencyModifier and tries to disable BillboardGuis/humanoid display (so others see it)
+-- ESP neon-pink full-body highlight (no Highlight instance)
 -- Fonts styled GothamBold, tick box white with black check
+-- Sticky now snaps instantly to the target offset (no follow delay)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -146,41 +147,99 @@ createCheckbox("ESP", 28, function(val)
     end
 end)
 
--- Invisible Checkbox (now hides name/health too)
+-- Invisible Checkbox (now tries to hide for everyone — sets both Transparency & LocalTransparencyModifier and disables billboard guis/humanoid display)
 createCheckbox("Invisible", 56, function(val)
     invisible = val
     if val then
         originalProps = {}
         if char then
             for _, inst in ipairs(char:GetDescendants()) do
+                -- BaseParts: store Transparency and LocalTransparencyModifier, then set both to fully invisible
                 if inst:IsA("BasePart") then
                     originalProps[inst] = {
-                        Transparency = inst.Transparency,
-                        LocalTransparencyModifier = inst.LocalTransparencyModifier
+                        Transparency = inst.Transparency
                     }
+                    -- try store local modifier if present
+                    local ok, prev = pcall(function() return inst.LocalTransparencyModifier end)
+                    if ok then originalProps[inst].LocalTransparencyModifier = prev end
+                    -- set both Transparency and LocalTransparencyModifier so it attempts to replicate (Transparency) and also hide locally
+                    pcall(function() inst.Transparency = 1 end)
                     pcall(function() inst.LocalTransparencyModifier = 1 end)
                 end
+
+                -- DECALS / TEXTURES
                 if inst:IsA("Decal") or inst:IsA("Texture") then
                     originalProps[inst] = {Transparency = inst.Transparency}
-                    inst.Transparency = 1
+                    pcall(function() inst.Transparency = 1 end)
                 end
+
+                -- GUI elements attached to character (BillboardGui / SurfaceGui) - disable if possible
+                if inst:IsA("BillboardGui") or inst:IsA("SurfaceGui") or inst:IsA("ScreenGui") then
+                    -- store Enabled if exists
+                    local ok, enabledPrev = pcall(function() return inst.Enabled end)
+                    if ok then
+                        originalProps[inst] = originalProps[inst] or {}
+                        originalProps[inst].Enabled = enabledPrev
+                        pcall(function() inst.Enabled = false end)
+                    else
+                        -- try Transparency on descendants (fallback)
+                        for _, sub in ipairs(inst:GetDescendants()) do
+                            if sub:IsA("TextLabel") or sub:IsA("ImageLabel") or sub:IsA("Frame") then
+                                originalProps[sub] = originalProps[sub] or {}
+                                local ok2, bg = pcall(function() return sub.BackgroundTransparency end)
+                                if ok2 then originalProps[sub].BackgroundTransparency = bg end
+                                pcall(function() sub.BackgroundTransparency = 1 end)
+                            end
+                        end
+                    end
+                end
+
+                -- PARTICLE EMITTERS / TRAILS
                 if inst:IsA("ParticleEmitter") or inst:IsA("Trail") then
                     originalProps[inst] = {Enabled = inst.Enabled}
-                    inst.Enabled = false
+                    pcall(function() inst.Enabled = false end)
                 end
             end
+
+            -- hide name/health bar by changing humanoid display type (store previous)
             if humanoid then
-                originalProps[humanoid] = {DisplayDistanceType = humanoid.DisplayDistanceType}
-                humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+                originalProps[humanoid] = originalProps[humanoid] or {}
+                originalProps[humanoid].DisplayDistanceType = humanoid.DisplayDistanceType
+                pcall(function() humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end)
             end
         end
     else
+        -- Restore everything we saved
         for inst, props in pairs(originalProps) do
             if inst and inst.Parent then
-                if props.Transparency ~= nil then pcall(function() inst.Transparency = props.Transparency end) end
-                if props.LocalTransparencyModifier ~= nil then pcall(function() inst.LocalTransparencyModifier = props.LocalTransparencyModifier end) end
-                if props.Enabled ~= nil then pcall(function() inst.Enabled = props.Enabled end) end
-                if props.DisplayDistanceType ~= nil then pcall(function() inst.DisplayDistanceType = props.DisplayDistanceType end) end
+                -- BasePart transparencies and LocalTransparencyModifier
+                if props.Transparency ~= nil and inst:IsA("BasePart") then
+                    pcall(function() inst.Transparency = props.Transparency end)
+                end
+                if props.LocalTransparencyModifier ~= nil and inst:IsA("BasePart") then
+                    pcall(function() inst.LocalTransparencyModifier = props.LocalTransparencyModifier end)
+                end
+
+                -- Decal / Texture transparency
+                if props.Transparency ~= nil and (inst:IsA("Decal") or inst:IsA("Texture")) then
+                    pcall(function() inst.Transparency = props.Transparency end)
+                end
+
+                -- GUI enabled restore
+                if props.Enabled ~= nil and (inst:IsA("BillboardGui") or inst:IsA("SurfaceGui") or inst:IsA("ScreenGui")) then
+                    pcall(function() inst.Enabled = props.Enabled end)
+                end
+
+                -- ParticleEmitters / Trails
+                if props.Enabled ~= nil and (inst:IsA("ParticleEmitter") or inst:IsA("Trail")) then
+                    pcall(function() inst.Enabled = props.Enabled end)
+                end
+
+                -- Humanoid display restore (if stored on humanoid)
+                if props.DisplayDistanceType ~= nil and typeof(inst) == "Instance" then
+                    -- This will be executed when inst is the humanoid
+                    pcall(function() inst.DisplayDistanceType = props.DisplayDistanceType end)
+                end
             end
         end
         originalProps = {}
@@ -336,8 +395,9 @@ local function enableESPForCharacter(ch)
     for _, inst in ipairs(ch:GetDescendants()) do
         if inst:IsA("BasePart") then
             if not espModified[inst] then
+                local ok, ltm = pcall(function() return inst.LocalTransparencyModifier end)
                 espModified[inst] = {
-                    LocalTransparencyModifier = inst.LocalTransparencyModifier,
+                    LocalTransparencyModifier = ok and ltm or nil,
                     Color = inst.Color,
                     Material = inst.Material
                 }
@@ -395,10 +455,12 @@ RunService.RenderStepped:Connect(function()
         end
         hrp.AssemblyLinearVelocity = desired * flySpeed
     end
+
     if stickyActive and stickyTarget and stickyTarget.Character and stickyTarget.Character:FindFirstChild("HumanoidRootPart") and hrp then
         local targetHRP = stickyTarget.Character.HumanoidRootPart
-        local backCFrame = targetHRP.CFrame * CFrame.new(0, 0, stickOffset.Z)
-        hrp.CFrame = CFrame.new(backCFrame.Position, targetHRP.Position)
+        -- snap instantly to the offset relative to target (no follow smoothing)
+        local stickCF = targetHRP.CFrame * CFrame.new(stickOffset)
+        hrp.CFrame = stickCF
     end
 end)
 
@@ -418,23 +480,26 @@ player.CharacterAdded:Connect(function(c)
         for _, inst in ipairs(char:GetDescendants()) do
             if inst:IsA("BasePart") then
                 originalProps[inst] = {
-                    Transparency = inst.Transparency,
-                    LocalTransparencyModifier = inst.LocalTransparencyModifier
+                    Transparency = inst.Transparency
                 }
+                local ok, prev = pcall(function() return inst.LocalTransparencyModifier end)
+                if ok then originalProps[inst].LocalTransparencyModifier = prev end
+                pcall(function() inst.Transparency = 1 end)
                 pcall(function() inst.LocalTransparencyModifier = 1 end)
             end
             if inst:IsA("Decal") or inst:IsA("Texture") then
                 originalProps[inst] = {Transparency = inst.Transparency}
-                inst.Transparency = 1
+                pcall(function() inst.Transparency = 1 end)
             end
             if inst:IsA("ParticleEmitter") or inst:IsA("Trail") then
                 originalProps[inst] = {Enabled = inst.Enabled}
-                inst.Enabled = false
+                pcall(function() inst.Enabled = false end)
             end
         end
         if humanoid then
-            originalProps[humanoid] = {DisplayDistanceType = humanoid.DisplayDistanceType}
-            humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+            originalProps[humanoid] = originalProps[humanoid] or {}
+            originalProps[humanoid].DisplayDistanceType = humanoid.DisplayDistanceType
+            pcall(function() humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end)
         end
     end
 
